@@ -4,8 +4,8 @@ import {
    logoutUser,
    registerUser,
    verifyEmail,
-} from "../controllers/auth.controllers.js";
-import { verifyJWT } from "../middlewares/auth.middleware.js";
+} from "../controllers/user.controllers.js";
+import { verifyJWT } from "../middlewares/user.middleware.js";
 
 const router = Router();
 //routes

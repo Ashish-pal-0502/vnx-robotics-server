@@ -22,9 +22,9 @@ app.get("/", (req, res) => {
 });
 
 //import routes
-import authRouter from "./routes/auth.routes.js";
+import userRouter from "./routes/user.routes.js";
 
 //routes
-app.use("/api/v1/auth", authRouter);
+app.use("/api/v1/user", userRouter);
 
 export { app };
