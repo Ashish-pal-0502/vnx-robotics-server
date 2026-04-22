@@ -2,9 +2,10 @@ import { asyncHandler } from "../utils/asyncHandler.js";
 import ApiError from "../middlewares/error.middleware.js";
 import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
-import jwt from "jsonwebtoken";
 import { StatusCodes } from "http-status-codes";
 import { sendVerificationMail } from "../helpers/email.helper.js";
+import { OAuth2Client } from "google-auth-library";
+import jwt from "jsonwebtoken";
 
 //generate access and refresh token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -36,14 +37,45 @@ const registerUser = asyncHandler(async (req, res, next) => {
          new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
       );
    }
-
    const user = await User.findOne({
       $or: [{ email }],
    });
    if (user) {
       return next(new ApiError(StatusCodes.CONFLICT, "User already exist!"));
    }
+   const mail = await sendVerificationMail(name, email, password);
+   if (!mail) {
+      return next(
+         new ApiError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            "Something went wrong while sending verification email!"
+         )
+      );
+   }
+   return res
+      .status(StatusCodes.CREATED)
+      .json(
+         new ApiResponse(
+            StatusCodes.CREATED,
+            {},
+            "Registration successfull! Please check your email to verify your account!"
+         )
+      );
+});
 
+//verify email
+const verifyEmail = asyncHandler(async (req, res, next) => {
+   const { accessToken } = req.params;
+   if (!accessToken) {
+      return next(
+         new ApiError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            "Something went wrong!"
+         )
+      );
+   }
+   const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
+   const { name, email, password } = decoded;
    const newUser = await User.create({
       name,
       email,
@@ -52,7 +84,6 @@ const registerUser = asyncHandler(async (req, res, next) => {
    const createdUser = await User.findById(newUser._id).select(
       "-password -refreshToken"
    );
-
    if (!createdUser) {
       return next(
          new ApiError(
@@ -61,14 +92,13 @@ const registerUser = asyncHandler(async (req, res, next) => {
          )
       );
    }
-   sendVerificationMail(name, email, createdUser._id);
    return res
-      .status(StatusCodes.CREATED)
+      .status(StatusCodes.OK)
       .json(
          new ApiResponse(
-            StatusCodes.CREATED,
-            createdUser,
-            "Registration successfull! Please check your email to verify your account!"
+            StatusCodes.OK,
+            { createdUser },
+            "User verified successfully!"
          )
       );
 });
@@ -117,6 +147,47 @@ const loginUser = asyncHandler(async (req, res, next) => {
       );
 });
 
+//google login
+const googleLogin = asyncHandler(async (req, res, next) => {
+   const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
+   const { tokenId } = req.body;
+   if (!tokenId) {
+      return next(
+         new ApiError(StatusCodes.BAD_REQUEST, "Token ID is required!")
+      );
+   }
+   const ticket = await client.verifyIdToken({
+      idToken: tokenId,
+   });
+   const payload = ticket.getPayload();
+   const { email, name } = payload;
+   let user = await User.findOne({ email });
+   if (!user) {
+      user = await User.create({
+         name,
+         email,
+         password: email + process.env.GOOGLE_CLIENT_ID,
+      });
+   }
+   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+   );
+   const loggedInUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+   );
+   return res
+      .status(StatusCodes.OK)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(
+         new ApiResponse(
+            StatusCodes.OK,
+            { user: loggedInUser, accessToken, refreshToken },
+            "User logged in successfully!"
+         )
+      );
+});
+
 //logout user
 const logoutUser = asyncHandler(async (req, res, next) => {
    await User.findByIdAndUpdate(
@@ -137,20 +208,49 @@ const logoutUser = asyncHandler(async (req, res, next) => {
       .json(new ApiResponse(StatusCodes.OK, {}, "User logged out!"));
 });
 
-//verify email
-const verifyEmail = asyncHandler(async (req, res, next) => {
-   const { id } = req.params;
-   const user = await User.findById({ _id: id });
-   if (user.is_verified) {
-      return next(
-         new ApiError(StatusCodes.CONFLICT, "Email already verified!")
-      );
+//for admin only
+//get users
+const getUsers = asyncHandler(async (req, res, next) => {
+   let search = "";
+   if (req.query.search) {
+      search = req.query.search;
    }
-   await User.updateOne({ _id: id }, { $set: { is_verified: 1 } });
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(StatusCodes.OK, {}, "Email verified successfully!")
-      );
+   let page = 1;
+   if (req.query.page) {
+      page = req.query.page;
+   }
+   const limit = 6;
+   const users = await User.find({
+      __v: 0,
+      $or: [
+         { name: { $regex: ".*" + search + ".*", $options: "i" } },
+         { email: { $regex: ".*" + search + ".*", $options: "i" } },
+      ],
+   })
+      .limit(limit * 1)
+      .skip((page - 1) * limit)
+      .exec();
+   const count = await User.find({
+      __v: 0,
+      $or: [
+         { name: { $regex: ".*" + search + ".*", $options: "i" } },
+         { email: { $regex: ".*" + search + ".*", $options: "i" } },
+      ],
+   }).countDocuments();
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse(StatusCodes.OK, {
+         users,
+         totalPages: Math.ceil(count / limit),
+         currentPage: page,
+      })
+   );
 });
-export { registerUser, loginUser, logoutUser, verifyEmail };
+
+export {
+   registerUser,
+   loginUser,
+   logoutUser,
+   verifyEmail,
+   googleLogin,
+   getUsers,
+};

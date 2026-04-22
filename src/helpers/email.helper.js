@@ -1,6 +1,7 @@
 import nodemailer from "nodemailer";
+import jwt from "jsonwebtoken";
 
-const sendVerificationMail = (name, email, userId) => {
+const sendVerificationMail = async (name, email, password) => {
    try {
       //creating transporter
       const transporter = nodemailer.createTransport({
@@ -13,6 +14,11 @@ const sendVerificationMail = (name, email, userId) => {
             pass: process.env.SMTP_PASSWORD,
          },
       });
+      const accessToken = jwt.sign(
+         { name, email, password },
+         process.env.ACCESS_TOKEN_SECRET,
+         { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+      );
       //creating mail options
       const message = {
          from: process.env.SMTP_MAIL,
@@ -22,21 +28,16 @@ const sendVerificationMail = (name, email, userId) => {
             "<p>HI! " +
             name +
             ', Please click here to <a href="' +
-            "http://localhost:7071/api/v1/auth" +
+            "http://localhost:7071/api/v1/user" +
             "/verify/" +
-            userId +
+            accessToken +
             '" target="_blank">Verify </a> your email. </p>',
       };
       //send email
-      transporter.sendMail(message, function (error, info) {
-         if (error) {
-            // email failed silently — use a logging service in production
-            console.error("Error sending verification email:", error);
-         }
-      });
+      const res = await transporter.sendMail(message);
+      return res;
    } catch (error) {
-      // transporter setup failed
-      console.error("Error setting up email transporter:", error);
+      return error;
    }
 };
 
