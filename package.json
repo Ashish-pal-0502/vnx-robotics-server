@@ -21,6 +21,7 @@
     "http-status-codes": "^2.3.0",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.4.1",
-    "nodemailer": "^8.0.5"
+    "nodemailer": "^8.0.5",
+    "uuid": "^14.0.0"
   }
 }

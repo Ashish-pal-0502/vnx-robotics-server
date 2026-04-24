@@ -1,5 +1,7 @@
 import { Router } from "express";
 import {
+   changePrivilege,
+   deleteUser,
    getUsers,
    googleLogin,
    loginUser,
@@ -24,4 +26,9 @@ router.route("/verify/:accessToken").post(verifyEmail);
 
 //only for admin
 router.route("/get-users").get(verifyJWT, isAdmin, getUsers);
+router.route("/delete-user/:id").delete(verifyJWT, isAdmin, deleteUser);
+router
+   .route("/change-privilege/:id")
+   .patch(verifyJWT, isAdmin, changePrivilege);
+
 export default router;

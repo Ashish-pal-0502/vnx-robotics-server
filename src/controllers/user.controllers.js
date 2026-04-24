@@ -76,6 +76,12 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
    }
    const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
    const { name, email, password } = decoded;
+   const user = await User.findOne({
+      $or: [{ email }],
+   });
+   if (user) {
+      return next(new ApiError(StatusCodes.CONFLICT, "User already verified!"));
+   }
    const newUser = await User.create({
       name,
       email,
@@ -246,11 +252,50 @@ const getUsers = asyncHandler(async (req, res, next) => {
    );
 });
 
+//change privilege
+const changePrivilege = asyncHandler(async (req, res, next) => {
+   const { value } = req.body;
+   const { id } = req.params;
+   const user = await User.findByIdAndUpdate(
+      { _id: id },
+      { $set: { is_admin: value } },
+      { new: true }
+   ).select("-password -refreshToken");
+   if (!user) {
+      return next(
+         new ApiError(
+            StatusCodes.INTERNAL_SERVER_ERROR,
+            "Error while changing user privilege!"
+         )
+      );
+   }
+   return res
+      .status(StatusCodes.OK)
+      .json(
+         new ApiResponse(
+            StatusCodes.OK,
+            user,
+            "Changed user privilege successfully."
+         )
+      );
+});
+
+//delete user
+const deleteUser = asyncHandler(async (req, res, next) => {
+   const { id } = req.params;
+   await User.deleteOne({ _id: id });
+   return res
+      .status(StatusCodes.OK)
+      .json(new ApiResponse(StatusCodes.OK, {}, "User deleted!"));
+});
+
 export {
    registerUser,
    loginUser,
    logoutUser,
+   changePrivilege,
    verifyEmail,
    googleLogin,
    getUsers,
+   deleteUser,
 };
