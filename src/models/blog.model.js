@@ -2,7 +2,6 @@ import mongoose from "mongoose";
 
 const blogSchema = new mongoose.Schema(
    {
-      _id: String,
       heading: {
          type: String,
          trim: true,
@@ -12,8 +11,8 @@ const blogSchema = new mongoose.Schema(
       },
       image: [
          {
-            type: String,
-            required: true,
+            url: String,
+            key: String,
          },
       ],
       slug: {
