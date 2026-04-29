@@ -24,14 +24,10 @@ const sendVerificationMail = async (name, email, password) => {
          from: process.env.SMTP_MAIL,
          to: email,
          subject: "For Verification Email",
-         html:
-            "<p>HI! " +
-            name +
-            ', Please click here to <a href="' +
-            "http://localhost:7071/api/v1/user" +
-            "/verify/" +
-            accessToken +
-            '" target="_blank">Verify </a> your email. </p>',
+         html: `<p>Hi ${name}, please click here to 
+  <a href="http://localhost:3000/verify/${accessToken}" target="_blank">
+  Verify
+  </a> your email.</p>`,
       };
       //send email
       const res = await transporter.sendMail(message);

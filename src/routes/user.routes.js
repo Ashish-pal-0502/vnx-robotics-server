@@ -22,7 +22,7 @@ router.route("/google-auth").post(googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
 //verify email
-router.route("/verify/:accessToken").post(verifyEmail);
+router.route("/verify/:accessToken").get(verifyEmail);
 
 //only for admin
 router.route("/get-users").get(verifyJWT, isAdmin, getUsers);
