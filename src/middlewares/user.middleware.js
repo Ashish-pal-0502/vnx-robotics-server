@@ -64,8 +64,9 @@ export const isAdmin = asyncHandler(async (req, _, next) => {
    try {
       //find admin user
       const user = await User.findById({ _id: req.user?._id });
+      console.log("user: ", user);
       //valiate admin role
-      if (user.is_admin !== 1) {
+      if (user.is_admin !== true) {
          throw new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access!");
       }
       next();

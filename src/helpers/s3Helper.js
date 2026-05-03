@@ -17,7 +17,7 @@ export const generateUploadURL = async (
       ContentType: fileType,
    });
 
-   const uploadURL = await getSignedUrl(s3, command, { expiresIn: 60 }); // 60 sec
+   const uploadURL = await getSignedUrl(s3, command, { expiresIn: 300 });
 
    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
 

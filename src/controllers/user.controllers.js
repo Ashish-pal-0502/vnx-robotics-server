@@ -25,17 +25,12 @@ const options = {
 
 //register user
 const registerUser = asyncHandler(async (req, res, next) => {
-   const { name, email, password } = req.body;
+   const { name, email } = req.body;
    if (!name) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Name is required!"));
    }
    if (!email) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
-   }
-   if (!password) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
-      );
    }
    const user = await User.findOne({
       $or: [{ email }],
@@ -43,7 +38,7 @@ const registerUser = asyncHandler(async (req, res, next) => {
    if (user) {
       return next(new ApiError(StatusCodes.CONFLICT, "User already exist!"));
    }
-   const mail = await sendVerificationMail(name, email, password);
+   const mail = await sendVerificationMail(name, email);
    if (!mail) {
       return next(
          new ApiError(
@@ -65,6 +60,12 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
 //verify email
 const verifyEmail = asyncHandler(async (req, res, next) => {
+   const { password } = req.body;
+   if (!password) {
+      return next(
+         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
+      );
+   }
    const { accessToken } = req.params;
    if (!accessToken) {
       return next(
@@ -75,7 +76,7 @@ const verifyEmail = asyncHandler(async (req, res, next) => {
       );
    }
    const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-   const { name, email, password } = decoded;
+   const { name, email } = decoded;
    const user = await User.findOne({
       $or: [{ email }],
    });

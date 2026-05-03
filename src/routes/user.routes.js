@@ -9,20 +9,24 @@ import {
    registerUser,
    verifyEmail,
 } from "../controllers/user.controllers.js";
-import { isAdmin, verifyJWT } from "../middlewares/user.middleware.js";
+import {
+   isAdmin,
+   isLogout,
+   verifyJWT,
+} from "../middlewares/user.middleware.js";
 
 const router = Router();
 //routes
 //register user
 router.route("/register").post(registerUser);
 //login user
-router.route("/login").post(loginUser);
+router.route("/login").post(isLogout, loginUser);
 //google login
 router.route("/google-auth").post(googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
 //verify email
-router.route("/verify/:accessToken").get(verifyEmail);
+router.route("/verify/:accessToken").post(verifyEmail);
 
 //only for admin
 router.route("/get-users").get(verifyJWT, isAdmin, getUsers);
