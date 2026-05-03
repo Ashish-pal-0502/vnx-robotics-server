@@ -6,7 +6,6 @@ const userSchema = new mongoose.Schema(
    {
       name: {
          type: String,
-         required: [true, "Name is required!"],
          minlength: [3, "Name must be at least 3 characters long!"],
          maxlength: [20, "Name must be less than 20 characters long!"],
          validate: {
@@ -32,13 +31,16 @@ const userSchema = new mongoose.Schema(
          minlength: [10, "Phone number must be 10 digits long!"],
          trim: true,
       },
+      is_verified: {
+         type: Boolean,
+         default: false,
+      },
       is_admin: {
          type: Boolean,
          default: false,
       },
       password: {
          type: String,
-         required: [true, "Password is required!"],
          minlength: [8, "Password must be at least 8 characters long!"],
          maxlength: [16, "Password must be less than 16 characters long!"],
          validate: {

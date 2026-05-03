@@ -2,18 +2,22 @@ import { Router } from "express";
 import {
    changePrivilege,
    deleteUser,
+   forgotPassword,
    getUsers,
    googleLogin,
    loginUser,
    logoutUser,
+   refreshAccessToken,
    registerUser,
-   verifyEmail,
+   sendOTP,
+   verifyUser,
 } from "../controllers/user.controllers.js";
 import {
    isAdmin,
    isLogout,
    verifyJWT,
 } from "../middlewares/user.middleware.js";
+import { sendOtpOnMail } from "../helpers/email.helper.js";
 
 const router = Router();
 //routes
@@ -25,8 +29,13 @@ router.route("/login").post(isLogout, loginUser);
 router.route("/google-auth").post(googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
-//verify email
-router.route("/verify/:accessToken").post(verifyEmail);
+//verify user
+router.route("/verify").post(verifyUser);
+router.route("/send-otp").post(isLogout, sendOTP);
+// forgot password
+router.route("/forgot-password").post(isLogout, forgotPassword);
+//refresh access token
+router.route("/refresh-token").post(refreshAccessToken);
 
 //only for admin
 router.route("/get-users").get(verifyJWT, isAdmin, getUsers);

@@ -48,14 +48,18 @@ export const isLogout = asyncHandler(async (req, _, next) => {
          authHeader?.replace(/^Bearer\s+/i, "").trim();
       //validate
       if (token) {
-         throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "You are already login you can change password!"
+         return next(
+            new ApiError(
+               StatusCodes.BAD_REQUEST,
+               "You are already login you can change password!"
+            )
          );
       }
       next();
    } catch (error) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, error || "Error in logout!");
+      return next(
+         new ApiError(StatusCodes.BAD_REQUEST, error || "Error in logout!")
+      );
    }
 });
 
@@ -64,16 +68,19 @@ export const isAdmin = asyncHandler(async (req, _, next) => {
    try {
       //find admin user
       const user = await User.findById({ _id: req.user?._id });
-      console.log("user: ", user);
       //valiate admin role
       if (user.is_admin !== true) {
-         throw new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access!");
+         return next(
+            new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access!")
+         );
       }
       next();
    } catch (error) {
-      throw new ApiError(
-         StatusCodes.UNAUTHORIZED,
-         error || "Error in admin access!"
+      return next(
+         new ApiError(
+            StatusCodes.UNAUTHORIZED,
+            error || "Error in admin access!"
+         )
       );
    }
 });

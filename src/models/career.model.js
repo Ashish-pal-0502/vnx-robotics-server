@@ -7,55 +7,45 @@ const careerSchema = new mongoose.Schema(
          required: [true, "Job title is required"],
          trim: true,
       },
-
       company: {
          type: String,
          required: [true, "Company name is required"],
          trim: true,
       },
-
       location: {
          type: String,
          required: [true, "Location is required"],
          trim: true,
       },
-
       jobType: {
          type: String,
          enum: ["Full-Time", "Part-Time", "Internship", "Contract"],
          default: "Full-Time",
       },
-
       experience: {
          type: String,
          required: true,
       },
-
       salary: {
          type: String,
       },
-
       description: {
          type: String,
          required: true,
       },
-
       skills: [
          {
             type: String,
             trim: true,
          },
       ],
-
       openings: {
          type: Number,
          default: 1,
       },
-
       deadline: {
          type: Date,
       },
-
       isActive: {
          type: Boolean,
          default: true,

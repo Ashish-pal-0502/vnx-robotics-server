@@ -3,7 +3,7 @@ import ApiError from "../middlewares/error.middleware.js";
 import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { StatusCodes } from "http-status-codes";
-import { sendVerificationMail } from "../helpers/email.helper.js";
+import { sendOtpOnMail } from "../helpers/email.helper.js";
 import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 
@@ -32,73 +32,54 @@ const registerUser = asyncHandler(async (req, res, next) => {
    if (!email) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
    }
-   const user = await User.findOne({
-      $or: [{ email }],
-   });
+   const user = await User.findOne({ email });
    if (user) {
       return next(new ApiError(StatusCodes.CONFLICT, "User already exist!"));
    }
-   const mail = await sendVerificationMail(name, email);
-   if (!mail) {
-      return next(
-         new ApiError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Something went wrong while sending verification email!"
-         )
-      );
-   }
+   const otp = Math.floor(100000 + Math.random() * 900000);
+   await sendOtpOnMail("Verify user OTP!", email, otp);
+   const newUser = await User.create({
+      name,
+      email,
+      otp,
+   });
    return res
       .status(StatusCodes.CREATED)
       .json(
          new ApiResponse(
             StatusCodes.CREATED,
-            {},
-            "Registration successfull! Please check your email to verify your account!"
+            { newUser },
+            "OTP send to user email please check your email!"
          )
       );
 });
 
-//verify email
-const verifyEmail = asyncHandler(async (req, res, next) => {
-   const { password } = req.body;
+//verify user
+const verifyUser = asyncHandler(async (req, res, next) => {
+   const { email, otp, password } = req.body;
+   if (!otp) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!"));
+   }
    if (!password) {
       return next(
          new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
       );
    }
-   const { accessToken } = req.params;
-   if (!accessToken) {
-      return next(
-         new ApiError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Something went wrong!"
-         )
-      );
+   const user = await User.findOne({ email });
+   if (!user) {
+      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found"));
    }
-   const decoded = jwt.verify(accessToken, process.env.ACCESS_TOKEN_SECRET);
-   const { name, email } = decoded;
-   const user = await User.findOne({
-      $or: [{ email }],
-   });
-   if (user) {
-      return next(new ApiError(StatusCodes.CONFLICT, "User already verified!"));
+   if (String(user.otp).trim() !== String(otp).trim()) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
    }
-   const newUser = await User.create({
-      name,
-      email,
-      password,
-   });
-   const createdUser = await User.findById(newUser._id).select(
+   user.password = password;
+   user.otp = "";
+   user.is_verified = true;
+   await user.save({ validateBeforeSave: false });
+   const createdUser = await User.findById(user._id).select(
       "-password -refreshToken"
    );
-   if (!createdUser) {
-      return next(
-         new ApiError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Something went wrong!"
-         )
-      );
-   }
+
    return res
       .status(StatusCodes.OK)
       .json(
@@ -173,7 +154,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       user = await User.create({
          name,
          email,
-         password: email + process.env.GOOGLE_CLIENT_ID,
+         password: crypto.randomBytes(16).toString("hex"),
       });
    }
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
@@ -213,6 +194,101 @@ const logoutUser = asyncHandler(async (req, res, next) => {
       .clearCookie("accessToken", options)
       .clearCookie("refreshToken", options)
       .json(new ApiResponse(StatusCodes.OK, {}, "User logged out!"));
+});
+
+//refresh access token
+const refreshAccessToken = asyncHandler(async (req, res, next) => {
+   const incomingRefreshToken =
+      req.cookies.refreshToken || req.body.refreshToken;
+   if (!incomingRefreshToken) {
+      return next(
+         new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized request!")
+      );
+   }
+   try {
+      const decodedToken = jwt.verify(
+         incomingRefreshToken,
+         process.env.REFRESH_TOKEN_SECRET
+      );
+      const user = await User.findById(decodedToken?._id).select(
+         "-password -refreshToken"
+      );
+      if (!user) {
+         return next(
+            new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token!")
+         );
+      }
+      const { accessToken, refreshToken } =
+         await generateAccessAndRefreshTokens(user._id);
+      return res
+         .status(StatusCodes.OK)
+         .cookie("accessToken", accessToken, options)
+         .cookie("refreshToken", incomingRefreshToken, options)
+         .json(
+            new ApiResponse(
+               StatusCodes.OK,
+               {
+                  user,
+                  accessToken: accessToken,
+                  refreshToken: incomingRefreshToken,
+               },
+               "Access token refreshed!"
+            )
+         );
+   } catch (error) {
+      return next(
+         new ApiError(
+            StatusCodes.UNAUTHORIZED,
+            error?.message || "Invalid refresh token!"
+         )
+      );
+   }
+});
+
+//send OTP
+const sendOTP = asyncHandler(async (req, res, next) => {
+   const { email } = req.body;
+   if (!email) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
+   }
+   const user = await User.findOne({ email });
+   if (!user) {
+      return next(new ApiError(StatusCodes.UNAUTHORIZED, "Invalid email!"));
+   }
+   const otp = Math.floor(100000 + Math.random() * 900000);
+   await User.updateOne({ email }, { $set: { otp: otp } });
+   await sendOtpOnMail("Forgot Password OTP!", email, otp);
+   return res
+      .status(StatusCodes.OK)
+      .json(
+         new ApiResponse(
+            StatusCodes.OK,
+            {},
+            "OTP sent to your email successfully!"
+         )
+      );
+});
+
+//forgot password
+const forgotPassword = asyncHandler(async (req, res, next) => {
+   const { email, otp, password } = req.body;
+   if (!otp || !password) {
+      return next(
+         new ApiError(StatusCodes.BAD_REQUEST, "OTP and Password is required!")
+      );
+   }
+   const user = await User.findOne({ email });
+   if (String(user.otp).trim() !== String(otp).trim()) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
+   }
+   user.password = password;
+   user.otp = "";
+   await user.save({ validateBeforeSave: false });
+   return res
+      .status(StatusCodes.OK)
+      .json(
+         new ApiResponse(StatusCodes.OK, {}, "Forgot password successfully!")
+      );
 });
 
 //for admin only
@@ -284,6 +360,10 @@ const changePrivilege = asyncHandler(async (req, res, next) => {
 //delete user
 const deleteUser = asyncHandler(async (req, res, next) => {
    const { id } = req.params;
+   const user = await User.findByIdAndDelete(id);
+   if (!user) {
+      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found"));
+   }
    await User.deleteOne({ _id: id });
    return res
       .status(StatusCodes.OK)
@@ -295,8 +375,11 @@ export {
    loginUser,
    logoutUser,
    changePrivilege,
-   verifyEmail,
+   verifyUser,
    googleLogin,
    getUsers,
    deleteUser,
+   forgotPassword,
+   refreshAccessToken,
+   sendOTP,
 };

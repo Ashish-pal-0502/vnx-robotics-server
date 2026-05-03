@@ -9,17 +9,14 @@ const MAX_SIZE = 2 * 1024 * 1024; // 2MB
 
 export const validateFile = ({ fileName, fileType, size }) => {
    const ext = path.extname(fileName).toLowerCase();
-
    // type + extension validation
    if (!allowedTypes.includes(fileType) || !allowedExt.includes(ext)) {
       throw new ApiError(400, "Invalid file type");
    }
-
    // size validation
    if (size < MIN_SIZE) {
       throw new ApiError(400, "File size too small (min 30KB)");
    }
-
    if (size > MAX_SIZE) {
       throw new ApiError(400, "File size too large (max 2MB)");
    }
