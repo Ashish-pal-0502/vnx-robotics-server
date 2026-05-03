@@ -49,10 +49,7 @@ export const isLogout = asyncHandler(async (req, _, next) => {
       //validate
       if (token) {
          return next(
-            new ApiError(
-               StatusCodes.BAD_REQUEST,
-               "You are already login you can change password!"
-            )
+            new ApiError(StatusCodes.BAD_REQUEST, "You are already logged in!")
          );
       }
       next();
@@ -67,13 +64,12 @@ export const isLogout = asyncHandler(async (req, _, next) => {
 export const isAdmin = asyncHandler(async (req, _, next) => {
    try {
       //find admin user
-      const user = await User.findById({ _id: req.user?._id });
-      //valiate admin role
-      if (user.is_admin !== true) {
+      if (!req.user?.is_admin) {
          return next(
-            new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access!")
+            new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access")
          );
       }
+      //valiate admin role
       next();
    } catch (error) {
       return next(

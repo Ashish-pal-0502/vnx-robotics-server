@@ -43,17 +43,14 @@ const userSchema = new mongoose.Schema(
          type: String,
          minlength: [8, "Password must be at least 8 characters long!"],
          maxlength: [16, "Password must be less than 16 characters long!"],
-         validate: {
-            validator: function (v) {
-               return /^(?=.*\d)(?=.*[a-z])(?=.*[A-Z])(?=.*\W).{8,}$/.test(v);
-            },
-            message: (props) => `${props.value} is not a valid password!`,
-         },
-      },
-      refreshToken: {
-         type: String,
       },
       otp: {
+         type: String,
+      },
+      otpExpiry: {
+         type: Date,
+      },
+      refreshToken: {
          type: String,
       },
    },

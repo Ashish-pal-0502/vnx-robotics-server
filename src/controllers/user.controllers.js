@@ -6,6 +6,7 @@ import { StatusCodes } from "http-status-codes";
 import { sendOtpOnMail } from "../helpers/email.helper.js";
 import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
+import crypto from "crypto";
 
 //generate access and refresh token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -20,7 +21,8 @@ const generateAccessAndRefreshTokens = async (userId) => {
 //cookie option
 const options = {
    httpOnly: true,
-   secure: true,
+   secure: process.env.COOKIE_SECURE === "true", // Set secure flag based on environment variable
+   sameSite: "Strict",
 };
 
 //register user
@@ -42,6 +44,8 @@ const registerUser = asyncHandler(async (req, res, next) => {
       name,
       email,
       otp,
+      password: crypto.randomBytes(5).toString("hex"),
+      otpExpiry: Date.now() + 10 * 60 * 1000, // OTP expiry time 10 minutes
    });
    return res
       .status(StatusCodes.CREATED)
@@ -72,14 +76,17 @@ const verifyUser = asyncHandler(async (req, res, next) => {
    if (String(user.otp).trim() !== String(otp).trim()) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
    }
+   if (user.otpExpiry < Date.now()) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!"));
+   }
    user.password = password;
    user.otp = "";
+   user.otpExpiry = undefined;
    user.is_verified = true;
    await user.save({ validateBeforeSave: false });
    const createdUser = await User.findById(user._id).select(
       "-password -refreshToken"
    );
-
    return res
       .status(StatusCodes.OK)
       .json(
@@ -108,6 +115,11 @@ const loginUser = asyncHandler(async (req, res, next) => {
    if (!user) {
       return next(
          new ApiError(StatusCodes.UNAUTHORIZED, "Invalid credentials!")
+      );
+   }
+   if (!user.is_verified) {
+      return next(
+         new ApiError(StatusCodes.FORBIDDEN, "Please verify your account")
       );
    }
    const isPasswordCorrect = await user.isPasswordCorrect(password);
@@ -154,7 +166,7 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       user = await User.create({
          name,
          email,
-         password: crypto.randomBytes(16).toString("hex"),
+         password: crypto.randomBytes(5).toString("hex"),
       });
    }
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
@@ -205,44 +217,34 @@ const refreshAccessToken = asyncHandler(async (req, res, next) => {
          new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized request!")
       );
    }
-   try {
-      const decodedToken = jwt.verify(
-         incomingRefreshToken,
-         process.env.REFRESH_TOKEN_SECRET
-      );
-      const user = await User.findById(decodedToken?._id).select(
-         "-password -refreshToken"
-      );
-      if (!user) {
-         return next(
-            new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token!")
-         );
-      }
-      const { accessToken, refreshToken } =
-         await generateAccessAndRefreshTokens(user._id);
-      return res
-         .status(StatusCodes.OK)
-         .cookie("accessToken", accessToken, options)
-         .cookie("refreshToken", incomingRefreshToken, options)
-         .json(
-            new ApiResponse(
-               StatusCodes.OK,
-               {
-                  user,
-                  accessToken: accessToken,
-                  refreshToken: incomingRefreshToken,
-               },
-               "Access token refreshed!"
-            )
-         );
-   } catch (error) {
+   const decodedToken = jwt.verify(
+      incomingRefreshToken,
+      process.env.REFRESH_TOKEN_SECRET
+   );
+   const user = await User.findById(decodedToken?._id);
+   if (!user || user.refreshToken !== incomingRefreshToken) {
       return next(
-         new ApiError(
-            StatusCodes.UNAUTHORIZED,
-            error?.message || "Invalid refresh token!"
-         )
+         new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token")
       );
    }
+   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+   );
+   return res
+      .status(StatusCodes.OK)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
+      .json(
+         new ApiResponse(
+            StatusCodes.OK,
+            {
+               user,
+               accessToken: accessToken,
+               refreshToken: refreshToken,
+            },
+            "Access token refreshed!"
+         )
+      );
 });
 
 //send OTP
@@ -256,7 +258,10 @@ const sendOTP = asyncHandler(async (req, res, next) => {
       return next(new ApiError(StatusCodes.UNAUTHORIZED, "Invalid email!"));
    }
    const otp = Math.floor(100000 + Math.random() * 900000);
-   await User.updateOne({ email }, { $set: { otp: otp } });
+   await User.updateOne(
+      { email },
+      { $set: { otp: otp, otpExpiry: Date.now() + 10 * 60 * 1000 } }
+   );
    await sendOtpOnMail("Forgot Password OTP!", email, otp);
    return res
       .status(StatusCodes.OK)
@@ -278,11 +283,18 @@ const forgotPassword = asyncHandler(async (req, res, next) => {
       );
    }
    const user = await User.findOne({ email });
+   if (!user) {
+      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found!"));
+   }
    if (String(user.otp).trim() !== String(otp).trim()) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
    }
+   if (user.otpExpiry < Date.now()) {
+      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!"));
+   }
    user.password = password;
    user.otp = "";
+   user.otpExpiry = undefined;
    await user.save({ validateBeforeSave: false });
    return res
       .status(StatusCodes.OK)
