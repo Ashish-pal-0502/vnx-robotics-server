@@ -126,11 +126,17 @@ const loginUser = asyncHandler(async (req, res, next) => {
    }
    if (!user.is_verified) {
       const otp = Math.floor(1000 + Math.random() * 9000);
+      user.otp = otp;
+      user.otpExpiry = Date.now() + 10 * 60 * 1000;
+      await User.updateOne(
+         { email },
+         { $set: { otp: otp, otpExpiry: Date.now() + 10 * 60 * 1000 } }
+      );
       await sendOtpOnMail("Verify user OTP!", email, otp);
       return next(
          new ApiError(
             StatusCodes.FORBIDDEN,
-            "Please verify your account! An email has been sent to your email for OTP."
+            "An OTP has been sent to your email. Please verify it to continue."
          )
       );
    }
