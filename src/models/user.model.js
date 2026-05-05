@@ -1,34 +1,23 @@
 import mongoose from "mongoose";
 import jwt from "jsonwebtoken";
 import bcrypt from "bcrypt";
+import crypto from "crypto";
 
 const userSchema = new mongoose.Schema(
    {
       name: {
          type: String,
-         minlength: [3, "Name must be at least 3 characters long!"],
-         maxlength: [20, "Name must be less than 20 characters long!"],
-         validate: {
-            validator: function (v) {
-               return /^[a-zA-Z\s]+$/.test(v); // Only allows letters and spaces
-            },
-            message: (props) => `${props.value} is not a valid name!`,
-         },
+         required: true,
          trim: true,
       },
       email: {
          type: String,
-         match: [/.+\@.+\..+/, "Please enter a valid email address!"],
-         minlength: [3, "Email must be at least 3 characters long!"],
-         maxlength: [30, "Email must be less than 30 characters long!"],
          unique: true,
+         required: true,
          trim: true,
       },
       phone: {
          type: String,
-         match: [/^\d{10}$/, "Please enter a valid 10-digit phone number!"],
-         maxlength: [10, "Phone number must be 10 digits long!"],
-         minlength: [10, "Phone number must be 10 digits long!"],
          trim: true,
       },
       is_verified: {
@@ -41,8 +30,7 @@ const userSchema = new mongoose.Schema(
       },
       password: {
          type: String,
-         minlength: [8, "Password must be at least 8 characters long!"],
-         maxlength: [16, "Password must be less than 16 characters long!"],
+         required: true,
       },
       otp: {
          type: String,
@@ -50,36 +38,45 @@ const userSchema = new mongoose.Schema(
       otpExpiry: {
          type: Date,
       },
+      otpAttempts: {
+         type: Number,
+         default: 0,
+      },
+      otpBlockedUntil: {
+         type: Date,
+      },
       refreshToken: {
          type: String,
+      },
+      refreshTokenExpiry: {
+         type: Date,
       },
    },
    { timestamps: true }
 );
 
 // encrypt password
-userSchema.pre("save", async function (next) {
+userSchema.pre("save", async function () {
    if (!this.isModified("password")) return;
    this.password = await bcrypt.hash(this.password, 10);
-   next;
 });
 
 //verify password
 userSchema.methods.isPasswordCorrect = async function (password) {
    return await bcrypt.compare(password, this.password);
 };
+
 //generate access token
 userSchema.methods.generateAccessToken = function () {
    return jwt.sign(
-      {
-         _id: this._id,
-         name: this.name,
-         email: this.email,
-      },
+      { _id: this._id, role: this.is_admin },
       process.env.ACCESS_TOKEN_SECRET,
-      { expiresIn: process.env.ACCESS_TOKEN_EXPIRY }
+      {
+         expiresIn: process.env.ACCESS_TOKEN_EXPIRY,
+      }
    );
 };
+
 //generate refresh token
 userSchema.methods.generateRefreshToken = function () {
    return jwt.sign(

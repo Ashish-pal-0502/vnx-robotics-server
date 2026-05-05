@@ -27,24 +27,29 @@ const options = {
 
 //register user
 const registerUser = asyncHandler(async (req, res, next) => {
-   const { name, email } = req.body;
+   const { name, email, password } = req.body;
    if (!name) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Name is required!"));
    }
    if (!email) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
    }
+   if (!password) {
+      return next(
+         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
+      );
+   }
    const user = await User.findOne({ email });
    if (user) {
       return next(new ApiError(StatusCodes.CONFLICT, "User already exist!"));
    }
-   const otp = Math.floor(100000 + Math.random() * 900000);
+   const otp = Math.floor(1000 + Math.random() * 9000);
    await sendOtpOnMail("Verify user OTP!", email, otp);
    const newUser = await User.create({
       name,
       email,
       otp,
-      password: crypto.randomBytes(5).toString("hex"),
+      password,
       otpExpiry: Date.now() + 10 * 60 * 1000, // OTP expiry time 10 minutes
    });
    return res
@@ -60,18 +65,13 @@ const registerUser = asyncHandler(async (req, res, next) => {
 
 //verify user
 const verifyUser = asyncHandler(async (req, res, next) => {
-   const { email, otp, password } = req.body;
+   const { email, otp } = req.body;
    if (!otp) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!"));
    }
-   if (!password) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
-      );
-   }
    const user = await User.findOne({ email });
    if (!user) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found"));
+      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found!"));
    }
    if (String(user.otp).trim() !== String(otp).trim()) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
@@ -79,7 +79,6 @@ const verifyUser = asyncHandler(async (req, res, next) => {
    if (user.otpExpiry < Date.now()) {
       return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!"));
    }
-   user.password = password;
    user.otp = "";
    user.otpExpiry = undefined;
    user.is_verified = true;
@@ -87,13 +86,21 @@ const verifyUser = asyncHandler(async (req, res, next) => {
    const createdUser = await User.findById(user._id).select(
       "-password -refreshToken"
    );
+   const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
+      user._id
+   );
+   const loggedInUser = await User.findById(user._id).select(
+      "-password -refreshToken"
+   );
    return res
       .status(StatusCodes.OK)
+      .cookie("accessToken", accessToken, options)
+      .cookie("refreshToken", refreshToken, options)
       .json(
          new ApiResponse(
             StatusCodes.OK,
-            { createdUser },
-            "User verified successfully!"
+            { user: loggedInUser, accessToken, refreshToken },
+            "User logged in successfully!"
          )
       );
 });
@@ -118,8 +125,13 @@ const loginUser = asyncHandler(async (req, res, next) => {
       );
    }
    if (!user.is_verified) {
+      const otp = Math.floor(1000 + Math.random() * 9000);
+      await sendOtpOnMail("Verify user OTP!", email, otp);
       return next(
-         new ApiError(StatusCodes.FORBIDDEN, "Please verify your account")
+         new ApiError(
+            StatusCodes.FORBIDDEN,
+            "Please verify your account! An email has been sent to your email for OTP."
+         )
       );
    }
    const isPasswordCorrect = await user.isPasswordCorrect(password);
@@ -194,7 +206,7 @@ const logoutUser = asyncHandler(async (req, res, next) => {
       req.user._id,
       {
          $set: {
-            refreshToken: undefined || "",
+            refreshToken: null,
          },
       },
       {
@@ -257,7 +269,7 @@ const sendOTP = asyncHandler(async (req, res, next) => {
    if (!user) {
       return next(new ApiError(StatusCodes.UNAUTHORIZED, "Invalid email!"));
    }
-   const otp = Math.floor(100000 + Math.random() * 900000);
+   const otp = Math.floor(1000 + Math.random() * 9000);
    await User.updateOne(
       { email },
       { $set: { otp: otp, otpExpiry: Date.now() + 10 * 60 * 1000 } }
@@ -372,7 +384,7 @@ const changePrivilege = asyncHandler(async (req, res, next) => {
 //delete user
 const deleteUser = asyncHandler(async (req, res, next) => {
    const { id } = req.params;
-   const user = await User.findByIdAndDelete(id);
+   const user = await User.findById(id);
    if (!user) {
       return next(new ApiError(StatusCodes.NOT_FOUND, "User not found"));
    }

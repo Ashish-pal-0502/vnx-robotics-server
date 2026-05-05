@@ -1,4 +1,5 @@
 import mongoose from "mongoose";
+import slugify from "slugify";
 
 const careerSchema = new mongoose.Schema(
    {
@@ -70,5 +71,17 @@ const careerSchema = new mongoose.Schema(
       timestamps: true,
    }
 );
+
+careerSchema.pre("save", function () {
+   if (this.isModified("title")) {
+      this.slug = slugify(this.title + "-" + Date.now(), {
+         lower: true,
+         strict: true,
+      });
+   }
+});
+
+// indexes for search performance
+careerSchema.index({ title: "text", company: "text", location: "text" });
 
 export const Career = mongoose.model("Career", careerSchema);
