@@ -1,5 +1,5 @@
 import path from "path";
-import ApiError from "../middlewares/error.middleware.js";
+import ApiError from "../utils/ApiError.js";
 
 const allowedTypes = ["image/png", "image/jpeg", "image/webp"];
 const allowedExt = [".png", ".jpg", ".jpeg", ".webp"];

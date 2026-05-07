@@ -1,5 +1,4 @@
 import { asyncHandler } from "../utils/asyncHandler.js";
-import ApiError from "../middlewares/error.middleware.js";
 import { User } from "../models/user.model.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { StatusCodes } from "http-status-codes";
@@ -7,6 +6,8 @@ import { sendOtpOnMail } from "../helpers/email.helper.js";
 import { OAuth2Client } from "google-auth-library";
 import jwt from "jsonwebtoken";
 import crypto from "crypto";
+import ApiError from "../utils/ApiError.js";
+import { error } from "console";
 
 //generate access and refresh token
 const generateAccessAndRefreshTokens = async (userId) => {
@@ -26,58 +27,58 @@ const options = {
 };
 
 //register user
-const registerUser = asyncHandler(async (req, res, next) => {
+const registerUser = asyncHandler(async (req, res) => {
    const { name, email, password } = req.body;
    if (!name) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Name is required!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Name is required!");
    }
    if (!email) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required!");
    }
    if (!password) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Password is required!");
    }
    const user = await User.findOne({ email });
    if (user) {
-      return next(new ApiError(StatusCodes.CONFLICT, "User already exist!"));
+      throw new ApiError(StatusCodes.CONFLICT, "User already exist!");
    }
    const otp = Math.floor(1000 + Math.random() * 9000);
    await sendOtpOnMail("Verify user OTP!", email, otp);
-   const newUser = await User.create({
+   await User.create({
       name,
       email,
       otp,
       password,
       otpExpiry: Date.now() + 10 * 60 * 1000, // OTP expiry time 10 minutes
    });
-   return res
-      .status(StatusCodes.CREATED)
-      .json(
-         new ApiResponse(
-            StatusCodes.CREATED,
-            { newUser },
-            "OTP send to user email please check your email!"
-         )
-      );
+   return res.status(StatusCodes.CREATED).json(
+      new ApiResponse({
+         statusCode: StatusCodes.CREATED,
+         data: {},
+         message:
+            "Registration successful! OTP send to user email please check your email!",
+      })
+   );
 });
 
 //verify user
-const verifyUser = asyncHandler(async (req, res, next) => {
+const verifyUser = asyncHandler(async (req, res) => {
    const { email, otp } = req.body;
    if (!otp) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!");
    }
    const user = await User.findOne({ email });
+   if (user && user.is_verified) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "User already verified!");
+   }
    if (!user) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found!"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found!");
    }
    if (String(user.otp).trim() !== String(otp).trim()) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!");
    }
    if (user.otpExpiry < Date.now()) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!");
    }
    user.otp = "";
    user.otpExpiry = undefined;
@@ -97,32 +98,28 @@ const verifyUser = asyncHandler(async (req, res, next) => {
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            { user: loggedInUser, accessToken, refreshToken },
-            "User logged in successfully!"
-         )
+         new ApiResponse({
+            statusCode: StatusCodes.OK,
+            data: {},
+            message: "User logged in successfully!",
+         })
       );
 });
 
 //login user
-const loginUser = asyncHandler(async (req, res, next) => {
+const loginUser = asyncHandler(async (req, res) => {
    const { email, password } = req.body;
    if (!email) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required!");
    }
    if (!password) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Password is required!")
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Password is required!");
    }
    const user = await User.findOne({
       $or: [{ email }],
    });
    if (!user) {
-      return next(
-         new ApiError(StatusCodes.UNAUTHORIZED, "Invalid credentials!")
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid credentials!");
    }
    if (!user.is_verified) {
       const otp = Math.floor(1000 + Math.random() * 9000);
@@ -133,18 +130,14 @@ const loginUser = asyncHandler(async (req, res, next) => {
          { $set: { otp: otp, otpExpiry: Date.now() + 10 * 60 * 1000 } }
       );
       await sendOtpOnMail("Verify user OTP!", email, otp);
-      return next(
-         new ApiError(
-            StatusCodes.FORBIDDEN,
-            "An OTP has been sent to your email. Please verify it to continue."
-         )
+      throw new ApiError(
+         StatusCodes.FORBIDDEN,
+         "An OTP has been sent to your email. Please verify it to continue."
       );
    }
    const isPasswordCorrect = await user.isPasswordCorrect(password);
    if (!isPasswordCorrect) {
-      return next(
-         new ApiError(StatusCodes.UNAUTHORIZED, "Invalid credentials!")
-      );
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid credentials!");
    }
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
@@ -157,25 +150,24 @@ const loginUser = asyncHandler(async (req, res, next) => {
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            { user: loggedInUser, accessToken, refreshToken },
-            "User logged in successfully!"
-         )
+         new ApiResponse({
+            statusCode: StatusCodes.OK,
+            data: {},
+            message: "User logged in successfully!",
+         })
       );
 });
 
 //google login
-const googleLogin = asyncHandler(async (req, res, next) => {
+const googleLogin = asyncHandler(async (req, res) => {
    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
    const { tokenId } = req.body;
    if (!tokenId) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Token ID is required!")
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Token ID is required!");
    }
    const ticket = await client.verifyIdToken({
       idToken: tokenId,
+      audience: process.env.GOOGLE_CLIENT_ID,
    });
    const payload = ticket.getPayload();
    const { email, name } = payload;
@@ -198,16 +190,27 @@ const googleLogin = asyncHandler(async (req, res, next) => {
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            { user: loggedInUser, accessToken, refreshToken },
-            "User logged in successfully!"
-         )
+         new ApiResponse({
+            statusCode: StatusCodes.OK,
+            data: {},
+            message: "User logged in successfully!",
+         })
       );
 });
 
+//get me
+const getMe = asyncHandler(async (req, res) => {
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { user: req.user },
+         message: "User found successfully.",
+      })
+   );
+});
+
 //logout user
-const logoutUser = asyncHandler(async (req, res, next) => {
+const logoutUser = asyncHandler(async (req, res) => {
    await User.findByIdAndUpdate(
       req.user._id,
       {
@@ -223,57 +226,76 @@ const logoutUser = asyncHandler(async (req, res, next) => {
       .status(StatusCodes.OK)
       .clearCookie("accessToken", options)
       .clearCookie("refreshToken", options)
-      .json(new ApiResponse(StatusCodes.OK, {}, "User logged out!"));
+      .json(
+         new ApiResponse({
+            statusCode: StatusCodes.OK,
+            data: {},
+            message: "User logged out!",
+         })
+      );
 });
 
 //refresh access token
-const refreshAccessToken = asyncHandler(async (req, res, next) => {
+const refreshAccessToken = asyncHandler(async (req, res) => {
    const incomingRefreshToken =
       req.cookies.refreshToken || req.body.refreshToken;
    if (!incomingRefreshToken) {
-      return next(
-         new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized request!")
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized request!");
+   }
+   let decodedToken;
+   try {
+      decodedToken = jwt.verify(
+         incomingRefreshToken,
+         process.env.REFRESH_TOKEN_SECRET
+      );
+   } catch (err) {
+      throw new ApiError(
+         StatusCodes.UNAUTHORIZED,
+         "Invalid or expired refresh token"
       );
    }
-   const decodedToken = jwt.verify(
-      incomingRefreshToken,
-      process.env.REFRESH_TOKEN_SECRET
-   );
-   const user = await User.findById(decodedToken?._id);
-   if (!user || user.refreshToken !== incomingRefreshToken) {
-      return next(
-         new ApiError(StatusCodes.UNAUTHORIZED, "Invalid refresh token")
+   const user = await User.findById(decodedToken._id);
+   if (!user) {
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "User not found");
+   }
+   if (user.refreshToken !== incomingRefreshToken) {
+      user.refreshToken = null;
+      await user.save();
+      throw new ApiError(
+         StatusCodes.UNAUTHORIZED,
+         "Refresh token reuse detected"
       );
    }
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
+   );
+   user.refreshToken = refreshToken;
+   await user.save();
+   const safeUser = await User.findById(user._id).select(
+      "-password -refreshToken"
    );
    return res
       .status(StatusCodes.OK)
       .cookie("accessToken", accessToken, options)
       .cookie("refreshToken", refreshToken, options)
       .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            {
-               user,
-               accessToken: accessToken,
-               refreshToken: refreshToken,
-            },
-            "Access token refreshed!"
-         )
+         new ApiResponse({
+            statusCode: StatusCodes.OK,
+            data: {},
+            message: "Access token refreshed successfully!",
+         })
       );
 });
 
 //send OTP
-const sendOTP = asyncHandler(async (req, res, next) => {
+const sendOTP = asyncHandler(async (req, res) => {
    const { email } = req.body;
    if (!email) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Email is required!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required!");
    }
    const user = await User.findOne({ email });
    if (!user) {
-      return next(new ApiError(StatusCodes.UNAUTHORIZED, "Invalid email!"));
+      throw new ApiError(StatusCodes.UNAUTHORIZED, "Invalid email!");
    }
    const otp = Math.floor(1000 + Math.random() * 9000);
    await User.updateOne(
@@ -281,49 +303,50 @@ const sendOTP = asyncHandler(async (req, res, next) => {
       { $set: { otp: otp, otpExpiry: Date.now() + 10 * 60 * 1000 } }
    );
    await sendOtpOnMail("Forgot Password OTP!", email, otp);
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            {},
-            "OTP sent to your email successfully!"
-         )
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "OTP sent to your email successfully!",
+      })
+   );
 });
 
 //forgot password
-const forgotPassword = asyncHandler(async (req, res, next) => {
+const forgotPassword = asyncHandler(async (req, res) => {
    const { email, otp, password } = req.body;
-   if (!otp || !password) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "OTP and Password is required!")
-      );
+   if (!otp) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!");
+   }
+   if (!password) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Password is required!");
    }
    const user = await User.findOne({ email });
    if (!user) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found!"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found!");
    }
    if (String(user.otp).trim() !== String(otp).trim()) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Invalid OTP!");
    }
    if (user.otpExpiry < Date.now()) {
-      return next(new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!"));
+      throw new ApiError(StatusCodes.BAD_REQUEST, "OTP has expired!");
    }
    user.password = password;
    user.otp = "";
    user.otpExpiry = undefined;
    await user.save({ validateBeforeSave: false });
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(StatusCodes.OK, {}, "Forgot password successfully!")
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "Forgot password successfully!",
+      })
+   );
 });
 
 //for admin only
 //get users
-const getUsers = asyncHandler(async (req, res, next) => {
+const getUsers = asyncHandler(async (req, res) => {
    let search = "";
    if (req.query.search) {
       search = req.query.search;
@@ -351,17 +374,30 @@ const getUsers = asyncHandler(async (req, res, next) => {
       ],
    }).countDocuments();
    return res.status(StatusCodes.OK).json(
-      new ApiResponse(StatusCodes.OK, {
-         users,
-         totalPages: Math.ceil(count / limit),
-         currentPage: page,
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {
+            users,
+            totalPages: Math.ceil(count / limit),
+            currentPage: page,
+         },
+         message: "Users fetched successfully!",
       })
    );
 });
 
 //change privilege
-const changePrivilege = asyncHandler(async (req, res, next) => {
+const changePrivilege = asyncHandler(async (req, res) => {
    const { value } = req.body;
+   if (value === undefined) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Value is required");
+   }
+   if (typeof value !== "boolean") {
+      throw new ApiError(
+         StatusCodes.BAD_REQUEST,
+         "Value must be a boolean indicating admin status"
+      );
+   }
    const { id } = req.params;
    const user = await User.findByIdAndUpdate(
       { _id: id },
@@ -369,35 +405,32 @@ const changePrivilege = asyncHandler(async (req, res, next) => {
       { new: true }
    ).select("-password -refreshToken");
    if (!user) {
-      return next(
-         new ApiError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Error while changing user privilege!"
-         )
-      );
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found!");
    }
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            user,
-            "Changed user privilege successfully."
-         )
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { user },
+         message: "Changed user privilege successfully!",
+      })
+   );
 });
 
 //delete user
-const deleteUser = asyncHandler(async (req, res, next) => {
+const deleteUser = asyncHandler(async (req, res) => {
    const { id } = req.params;
    const user = await User.findById(id);
    if (!user) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "User not found"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "User not found!");
    }
    await User.deleteOne({ _id: id });
-   return res
-      .status(StatusCodes.OK)
-      .json(new ApiResponse(StatusCodes.OK, {}, "User deleted!"));
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "User deleted!",
+      })
+   );
 });
 
 export {
@@ -408,6 +441,7 @@ export {
    verifyUser,
    googleLogin,
    getUsers,
+   getMe,
    deleteUser,
    forgotPassword,
    refreshAccessToken,

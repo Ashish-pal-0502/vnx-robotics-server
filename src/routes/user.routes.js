@@ -3,6 +3,7 @@ import {
    changePrivilege,
    deleteUser,
    forgotPassword,
+   getMe,
    getUsers,
    googleLogin,
    loginUser,
@@ -30,10 +31,12 @@ router.route("/google-auth").post(googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
 //verify user
-router.route("/verify").post(verifyUser);
+router.route("/verify").post(isLogout, verifyUser);
 router.route("/send-otp").post(isLogout, sendOTP);
 // forgot password
 router.route("/forgot-password").post(isLogout, forgotPassword);
+//get logged in user details
+router.route("/me").get(verifyJWT, getMe);
 //refresh access token
 router.route("/refresh-token").post(refreshAccessToken);
 

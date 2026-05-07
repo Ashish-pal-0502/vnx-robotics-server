@@ -6,7 +6,6 @@ import colors from "colors";
 dotenv.config({ path: "./.env" });
 
 const { app } = await import("./app.js");
-const { errorMiddleware } = await import("./middlewares/error.middleware.js");
 
 connectDB()
    .then(() => {
@@ -19,6 +18,3 @@ connectDB()
    .catch((error) => {
       console.log(`\n🔗 MONGODB CONNECTION FAILED!!! ${error}`.bgRed.white);
    });
-
-//error middleware
-app.use(errorMiddleware);

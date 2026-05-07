@@ -1,55 +1,45 @@
-import ApiError from "../middlewares/error.middleware.js";
+import ApiError from "../utils/ApiError.js";
 import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 import { Blog } from "../models/blog.model.js";
 import { generateUploadURL, deleteFileFromS3 } from "../helpers/s3Helper.js";
 import slugify from "slugify";
 import { StatusCodes } from "http-status-codes";
-import { validateFile } from "../utils/fileValidation.js";
+import { validateFile } from "../validators/file.validation.js";
 
 // generate presigned URL for S3 upload
-const getUploadUrl = asyncHandler(async (req, res, next) => {
+const getUploadUrl = asyncHandler(async (req, res) => {
    const { fileName, fileType, size } = req.body;
-   if (!fileName || !fileType) {
-      return next(
-         new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "fileName and fileType are required!"
-         )
-      );
+   if (!fileName) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "fileName is required!");
+   }
+   if (!fileType) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "fileType is required!");
    }
    validateFile({ fileName, fileType, size });
    const data = await generateUploadURL(fileName, fileType, "blogs");
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(
-            StatusCodes.OK,
-            { data },
-            "Upload URL generated successfully!"
-         )
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { data },
+         message: "Upload URL generated successfully!",
+      })
+   );
 });
 
 //create blog
-const createBlog = asyncHandler(async (req, res, next) => {
+const createBlog = asyncHandler(async (req, res) => {
    const { heading, content, mtitle, mdesc, images } = req.body;
    if (!heading) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Heading is required!")
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Heading is required!");
    }
    if (!content) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Content is required!")
-      );
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Content is required!");
    }
    if (!images || images.length === 0) {
-      return next(
-         new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "At least one image is required!"
-         )
+      throw new ApiError(
+         StatusCodes.BAD_REQUEST,
+         "At least one image is required!"
       );
    }
    const blog = await Blog.create({
@@ -62,37 +52,31 @@ const createBlog = asyncHandler(async (req, res, next) => {
       user: req.user?.id || "admin",
    });
    if (!blog) {
-      return next(
-         new ApiError(
-            StatusCodes.INTERNAL_SERVER_ERROR,
-            "Blog creation failed!"
-         )
+      throw new ApiError(
+         StatusCodes.INTERNAL_SERVER_ERROR,
+         "Blog creation failed!"
       );
    }
-   return res
-      .status(StatusCodes.CREATED)
-      .json(
-         new ApiResponse(
-            StatusCodes.CREATED,
-            { blog },
-            "Blog created successfully!"
-         )
-      );
+   return res.status(StatusCodes.CREATED).json(
+      new ApiResponse({
+         StatusCodes: StatusCodes.CREATED,
+         data: { blog },
+         message: "Blog created successfully!",
+      })
+   );
 });
 
 //update blog
-const updateBlog = asyncHandler(async (req, res, next) => {
+const updateBlog = asyncHandler(async (req, res) => {
    const blog = await Blog.findById(req.params.id);
    if (!blog) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "Blog not found!"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "Blog not found!");
    }
    const { images } = req.body;
    if (images && images.length === 0) {
-      return next(
-         new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "At least one image is required!"
-         )
+      throw new ApiError(
+         StatusCodes.BAD_REQUEST,
+         "At least one image is required!"
       );
    }
    const oldImages = blog.image;
@@ -109,51 +93,55 @@ const updateBlog = asyncHandler(async (req, res, next) => {
    blog.mdesc = req.body.mdesc || blog.mdesc;
    blog.slug = slugify(blog.heading, { lower: true }) || blog.slug;
    await blog.save();
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(StatusCodes.OK, { blog }, "Blog updated successfully!")
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         StatusCodes: StatusCodes.OK,
+         data: { blog },
+         message: "Blog updated successfully!",
+      })
+   );
 });
 
 //delete blog by id
-const deleteBlog = asyncHandler(async (req, res, next) => {
+const deleteBlog = asyncHandler(async (req, res) => {
    const blog = await Blog.findById(req.params.id);
    if (!blog) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "Blog not found!"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "Blog not found!");
    }
    for (let img of blog.image) {
       await deleteFileFromS3(img.key);
    }
    await blog.deleteOne();
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(StatusCodes.OK, null, "Blog deleted successfully!")
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "Blog deleted successfully!",
+      })
+   );
 });
 
-//get blog by id
-const getBlogById = asyncHandler(async (req, res, next) => {
-   const { id } = req.params;
-   if (!id) {
-      return next(
-         new ApiError(StatusCodes.BAD_REQUEST, "Blog ID is required!")
-      );
+//get blog by slug
+const getBlogBySlug = asyncHandler(async (req, res) => {
+   const { slug } = req.params;
+   if (!slug) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Blog slug is required!");
    }
-   const blog = await Blog.findById(id);
+   const blog = await Blog.findOne({ slug });
    if (!blog) {
-      return next(new ApiError(StatusCodes.NOT_FOUND, "Blog not found!"));
+      throw new ApiError(StatusCodes.NOT_FOUND, "Blog not found!");
    }
-   return res
-      .status(StatusCodes.OK)
-      .json(
-         new ApiResponse(StatusCodes.OK, { blog }, "Blog fetched successfully!")
-      );
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { blog },
+         message: "Blog fetched successfully!",
+      })
+   );
 });
 
 //get all blogs
-const getAllBlogs = asyncHandler(async (req, res, next) => {
+const getAllBlogs = asyncHandler(async (req, res) => {
    let { page = 1, limit = 10, search = "" } = req.query;
    page = parseInt(page);
    limit = parseInt(limit);
@@ -166,9 +154,9 @@ const getAllBlogs = asyncHandler(async (req, res, next) => {
       .limit(limit)
       .sort({ createdAt: -1 });
    return res.status(StatusCodes.OK).json(
-      new ApiResponse(
-         StatusCodes.OK,
-         {
+      new ApiResponse({
+         StatusCodes: StatusCodes.OK,
+         data: {
             blogs,
             pagination: {
                total,
@@ -176,8 +164,8 @@ const getAllBlogs = asyncHandler(async (req, res, next) => {
                pages: Math.ceil(total / limit),
             },
          },
-         "Blogs fetched successfully!"
-      )
+         message: "Blogs fetched successfully!",
+      })
    );
 });
 
@@ -186,6 +174,6 @@ export {
    createBlog,
    updateBlog,
    deleteBlog,
-   getBlogById,
+   getBlogBySlug,
    getAllBlogs,
 };

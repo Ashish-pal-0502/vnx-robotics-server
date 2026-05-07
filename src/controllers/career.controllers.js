@@ -2,7 +2,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
 
 //create a job
-const createJob = asyncHandler(async (req, res, next) => {
+const createJob = asyncHandler(async (req, res) => {
    const job = await Career.create({
       ...req.body,
       postedBy: req.user._id,
@@ -48,7 +48,7 @@ const getJobs = asyncHandler(async (req, res) => {
 });
 
 //get a job by slug
-const getJobBySlug = asyncHandler(async (req, res, next) => {
+const getJobBySlug = asyncHandler(async (req, res) => {
    const { slug } = req.params;
    const job = await Career.findOne({ slug }).populate(
       "postedBy",
@@ -61,7 +61,7 @@ const getJobBySlug = asyncHandler(async (req, res, next) => {
 });
 
 //update a job
-const updateJob = asyncHandler(async (req, res, next) => {
+const updateJob = asyncHandler(async (req, res) => {
    const { id } = req.params;
    const job = await Career.findById(id);
    if (!job) {
@@ -82,7 +82,7 @@ const updateJob = asyncHandler(async (req, res, next) => {
 });
 
 //delete a job
-const deleteJob = asyncHandler(async (req, res, next) => {
+const deleteJob = asyncHandler(async (req, res) => {
    const { id } = req.params;
    const job = await Career.findById(id);
    if (!job) {
@@ -95,7 +95,7 @@ const deleteJob = asyncHandler(async (req, res, next) => {
 });
 
 //toggle job status
-const toggleJobStatus = asyncHandler(async (req, res, next) => {
+const toggleJobStatus = asyncHandler(async (req, res) => {
    const { id } = req.params;
    const job = await Career.findById(id);
    if (!job) {

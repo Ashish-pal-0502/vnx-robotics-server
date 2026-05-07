@@ -26,9 +26,13 @@ app.get("/", (req, res) => {
 //import routes
 import userRouter from "./routes/user.routes.js";
 import blogRouter from "./routes/blog.routes.js";
+import errorMiddleware from "./middlewares/error.middleware.js";
 
 //routes
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
+
+//error middleware
+app.use(errorMiddleware);
 
 export { app };
