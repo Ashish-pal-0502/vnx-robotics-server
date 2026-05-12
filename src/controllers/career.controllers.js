@@ -1,118 +1,109 @@
-import { ApiResponse } from "../utils/ApiResponse.js";
+import ApiError from "../utils/ApiError.js";
 import { asyncHandler } from "../utils/asyncHandler.js";
+import { ApiResponse } from "../utils/ApiResponse.js";
+import { Career } from "../models/career.model.js";
+import { StatusCodes } from "http-status-codes";
 
-//create a job
-const createJob = asyncHandler(async (req, res) => {
-   const job = await Career.create({
-      ...req.body,
-      postedBy: req.user._id,
+// Crate career
+const createCareer = asyncHandler(async (req, res) => {
+   const { title, description, applyLink } = req.body;
+   if (!title) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Title is required!");
+   }
+   if (!description) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Description is required!");
+   }
+   if (!applyLink) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Appy link is required!");
+   }
+   const career = await Career.create({
+      title,
+      description,
+      applyLink,
+      postedBy: req.user?._id,
    });
-   return res
-      .status(201)
-      .json(new ApiResponse(201, job, "Job created successfully"));
-});
-
-//get all jobs with pagination and search
-const getJobs = asyncHandler(async (req, res) => {
-   const { search = "", page = 1, limit = 10, jobType, location } = req.query;
-   const query = {
-      isActive: true,
-      $and: [
-         search
-            ? {
-                 $or: [
-                    { title: { $regex: search, $options: "i" } },
-                    { company: { $regex: search, $options: "i" } },
-                    { location: { $regex: search, $options: "i" } },
-                 ],
-              }
-            : {},
-         jobType ? { jobType } : {},
-         location ? { location: { $regex: location, $options: "i" } } : {},
-      ],
-   };
-   const jobs = await Career.find(query)
-      .populate("postedBy", "name email")
-      .sort({ createdAt: -1 })
-      .skip((page - 1) * limit)
-      .limit(Number(limit));
-   const total = await Career.countDocuments(query);
-   return res.status(200).json(
-      new ApiResponse(200, {
-         jobs,
-         total,
-         page: Number(page),
-         pages: Math.ceil(total / limit),
+   return res.status(StatusCodes.CREATED).json(
+      new ApiResponse({
+         statusCode: StatusCodes.CREATED,
+         data: { career },
+         message: "Career created sucessfully!",
       })
    );
 });
 
-//get a job by slug
-const getJobBySlug = asyncHandler(async (req, res) => {
-   const { slug } = req.params;
-   const job = await Career.findOne({ slug }).populate(
+//Get all careers
+const getAllCareers = asyncHandler(async (req, res) => {
+   const careers = await Career.find()
+      .populate("postedBy", "name email")
+      .sort({ createdAt: -1 });
+
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { count: careers.length, data: careers },
+         message: "Career found sucessfully!",
+      })
+   );
+});
+
+//Get single career
+const getCareerById = async (req, res, next) => {
+   const career = await Career.findById(req.params.id).populate(
       "postedBy",
       "name email"
    );
-   if (!job) {
-      return next(new ApiError(404, "Job not found"));
+   if (!career) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Career not found");
    }
-   return res.status(200).json(new ApiResponse(200, job));
-});
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { career },
+         message: "Career created sucessfully!",
+      })
+   );
+};
 
-//update a job
-const updateJob = asyncHandler(async (req, res) => {
-   const { id } = req.params;
-   const job = await Career.findById(id);
-   if (!job) {
-      return next(new ApiError(404, "Job not found"));
+//Update career
+const updateCareer = async (req, res, next) => {
+   const { title, description, applyLink } = req.body;
+   const career = await Career.findById(req.params.id);
+   if (!career) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Career not found!");
    }
-   // optional: only owner/admin can update
-   if (
-      !req.user.is_admin &&
-      job.postedBy.toString() !== req.user._id.toString()
-   ) {
-      return next(new ApiError(403, "Not authorized"));
-   }
-   Object.assign(job, req.body);
-   await job.save();
-   return res
-      .status(200)
-      .json(new ApiResponse(200, job, "Job updated successfully"));
-});
+   career.title = title || career.title;
+   career.description = description || career.description;
+   career.applyLink = applyLink || career.applyLink;
+   await career.save();
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "Career updated successfully!",
+      })
+   );
+};
 
-//delete a job
-const deleteJob = asyncHandler(async (req, res) => {
-   const { id } = req.params;
-   const job = await Career.findById(id);
-   if (!job) {
-      return next(new ApiError(404, "Job not found"));
+// Delete career
+const deleteCareer = asyncHandler(async (req, res, next) => {
+   const career = await Career.findById(req.params.id);
+   if (!career) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Career not found!");
    }
-   await job.deleteOne();
-   return res
-      .status(200)
-      .json(new ApiResponse(200, {}, "Job deleted successfully"));
-});
-
-//toggle job status
-const toggleJobStatus = asyncHandler(async (req, res) => {
-   const { id } = req.params;
-   const job = await Career.findById(id);
-   if (!job) {
-      return next(new ApiError(404, "Job not found"));
-   }
-   job.isActive = !job.isActive;
-   await job.save();
-
-   return res.status(200).json(new ApiResponse(200, job, "Job status updated"));
+   await career.deleteOne();
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: {},
+         message: "Career deleted successfully",
+      })
+   );
 });
 
 export {
-   createJob,
-   getJobs,
-   getJobBySlug,
-   updateJob,
-   deleteJob,
-   toggleJobStatus,
-   jobStats,
+   createCareer,
+   getAllCareers,
+   getCareerById,
+   updateCareer,
+   deleteCareer,
 };

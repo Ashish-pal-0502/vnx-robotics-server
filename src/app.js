@@ -26,11 +26,13 @@ app.get("/", (req, res) => {
 //import routes
 import userRouter from "./routes/user.routes.js";
 import blogRouter from "./routes/blog.routes.js";
+import careerRouter from "./routes/career.routes.js";
 import errorMiddleware from "./middlewares/error.middleware.js";
 
 //routes
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
+app.use("/api/v1/career", careerRouter);
 
 //error middleware
 app.use(errorMiddleware);

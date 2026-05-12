@@ -152,7 +152,7 @@ const loginUser = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: {},
+            data: { accessToken },
             message: "User logged in successfully!",
          })
       );
@@ -161,13 +161,13 @@ const loginUser = asyncHandler(async (req, res) => {
 //google login
 const googleLogin = asyncHandler(async (req, res) => {
    const client = new OAuth2Client(process.env.GOOGLE_CLIENT_ID);
-   const { tokenId } = req.body;
+   const { tokenId, audience } = req.body;
    if (!tokenId) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Token ID is required!");
    }
    const ticket = await client.verifyIdToken({
       idToken: tokenId,
-      audience: process.env.GOOGLE_CLIENT_ID,
+      audience: audience,
    });
    const payload = ticket.getPayload();
    const { email, name } = payload;
@@ -192,7 +192,7 @@ const googleLogin = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: {},
+            data: { accessToken },
             message: "User logged in successfully!",
          })
       );
