@@ -100,7 +100,7 @@ const verifyUser = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: {},
+            data: { accessToken },
             message: "User logged in successfully!",
          })
       );
