@@ -24,9 +24,10 @@ const userSchema = new mongoose.Schema(
          type: Boolean,
          default: false,
       },
-      is_admin: {
-         type: Boolean,
-         default: false,
+      role: {
+         type: String,
+         enum: ["user", "admin"],
+         default: "user",
       },
       password: {
          type: String,
@@ -71,7 +72,7 @@ userSchema.methods.generateAccessToken = function () {
    return jwt.sign(
       {
          _id: this._id,
-         role: this.is_admin,
+         userType: this.role,
          name: this.name,
          email: this.email,
       },
