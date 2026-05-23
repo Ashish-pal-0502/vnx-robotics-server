@@ -46,6 +46,10 @@ const userSchema = new mongoose.Schema(
       otpBlockedUntil: {
          type: Date,
       },
+      is_admin: {
+         type: Boolean,
+         default: false,
+      },
       refreshToken: {
          type: String,
       },

@@ -401,7 +401,12 @@ const changePrivilege = asyncHandler(async (req, res) => {
    const { id } = req.params;
    const user = await User.findByIdAndUpdate(
       { _id: id },
-      { $set: { is_admin: value } },
+      {
+         $set: {
+            role: value ? "admin" : "user",
+            is_admin: value,
+         },
+      },
       { new: true }
    ).select("-password -refreshToken");
    if (!user) {

@@ -77,12 +77,13 @@ export const isLogout = asyncHandler(async (req, _, next) => {
 export const isAdmin = asyncHandler(async (req, _, next) => {
    try {
       //find admin user
-      if (!req.user?.is_admin) {
+      const isAdminUser = req.user?.role === "admin" || req.user?.is_admin;
+      if (!isAdminUser) {
          return next(
             new ApiError(StatusCodes.UNAUTHORIZED, "Unauthorized access")
          );
       }
-      //valiate admin role
+      //validate admin role
       next();
    } catch (error) {
       return next(

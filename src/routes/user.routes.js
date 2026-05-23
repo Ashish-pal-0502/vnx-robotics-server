@@ -39,6 +39,7 @@ router.route("/forgot-password").post(isLogout, forgotPassword);
 router.route("/me").get(verifyJWT, getMe);
 //refresh access token
 router.route("/refresh-token").post(refreshAccessToken);
+router.route("/refresh-tokens").post(refreshAccessToken);
 
 //only for admin
 router.route("/get-users").get(verifyJWT, isAdmin, getUsers);
