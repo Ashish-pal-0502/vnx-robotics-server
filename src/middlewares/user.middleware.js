@@ -30,6 +30,19 @@ export const verifyJWT = asyncHandler(async (req, _, next) => {
       req.user = user;
       next();
    } catch (error) {
+      // If the error is related to JWT verification, return 401 Unauthorized
+      if (
+         error?.name === "TokenExpiredError" ||
+         error?.name === "JsonWebTokenError" ||
+         error?.name === "NotBeforeError"
+      ) {
+         return next(
+            new ApiError(
+               StatusCodes.UNAUTHORIZED,
+               error?.message || "Invalid access token!"
+            )
+         );
+      }
       return next(
          new ApiError(
             StatusCodes.INTERNAL_SERVER_ERROR,

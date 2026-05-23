@@ -9,7 +9,6 @@ export const loginLimiter = rateLimit({
    max: 5, // max 5 requests
    standardHeaders: true,
    legacyHeaders: false,
-
    handler: (req, res) => {
       return res.status(StatusCodes.TOO_MANY_REQUESTS).json(
          ApiResponse.error({
@@ -25,7 +24,6 @@ export const loginLimiter = rateLimit({
 export const otpLimiter = rateLimit({
    windowMs: 10 * 60 * 1000,
    max: 3,
-
    handler: (req, res) => {
       return res.status(429).json(
          ApiResponse.error({
