@@ -7,7 +7,6 @@ const blogSchema = new mongoose.Schema(
          trim: true,
          min: 3,
          max: 160,
-         required: true,
       },
       image: [
          {
@@ -20,7 +19,6 @@ const blogSchema = new mongoose.Schema(
       },
       content: {
          type: String,
-         required: true,
       },
       mtitle: {
          type: String,
