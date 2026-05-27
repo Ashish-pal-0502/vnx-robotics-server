@@ -281,7 +281,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: { accessToken },
+            data: { accessToken, refreshToken },
             message: "Access token refreshed successfully!",
          })
       );
