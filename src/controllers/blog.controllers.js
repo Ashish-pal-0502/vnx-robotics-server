@@ -66,7 +66,7 @@ const createBlog = asyncHandler(async (req, res) => {
    );
 });
 
-//update blog
+// update blog
 const updateBlog = asyncHandler(async (req, res) => {
    const blog = await Blog.findById(req.params.id);
    if (!blog) {
@@ -79,19 +79,26 @@ const updateBlog = asyncHandler(async (req, res) => {
          "At least one image is required!"
       );
    }
-   const oldImages = blog.image;
-   if (images?.length) {
-      blog.image = images;
+   const oldImages = blog.image || [];
+   const newImages = images || oldImages;
+   const removedImages = oldImages.filter(
+      (oldImg) => !newImages.some((newImg) => newImg.key === oldImg.key)
+   );
+   for (const img of removedImages) {
+      if (img.key) {
+         await deleteFileFromS3(img.key);
+      }
    }
-   await blog.save();
-   for (const img of oldImages) {
-      await deleteFileFromS3(img.key);
-   }
+   blog.image = newImages;
    blog.heading = req.body.heading || blog.heading;
    blog.content = req.body.content || blog.content;
    blog.mtitle = req.body.mtitle || blog.mtitle;
    blog.mdesc = req.body.mdesc || blog.mdesc;
-   blog.slug = slugify(blog.heading, { lower: true }) || blog.slug;
+   blog.slug =
+      slugify(
+         typeof req.body.heading === "string" ? req.body.heading : blog.heading,
+         { lower: true }
+      ) || blog.slug;
    await blog.save();
    return res.status(StatusCodes.OK).json(
       new ApiResponse({

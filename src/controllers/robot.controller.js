@@ -78,10 +78,17 @@ const updateRobot = asyncHandler(async (req, res) => {
          "At least one image is required!"
       );
    }
-   const oldImages = robot.images;
-   if (images?.length) {
-      robot.images = images;
+   const oldImages = robot.images || [];
+   const newImages = images || oldImages;
+   const removedImages = oldImages.filter(
+      (oldImg) => !newImages.some((newImg) => newImg.key === oldImg.key)
+   );
+   for (const img of removedImages) {
+      if (img.key) {
+         await deleteFileFromS3(img.key);
+      }
    }
+   robot.images = newImages;
    robot.name = req.body.name || robot.name;
    robot.description = req.body.description || robot.description;
    robot.slug = req.body.name
@@ -90,12 +97,6 @@ const updateRobot = asyncHandler(async (req, res) => {
         })}-${Date.now()}`
       : robot.slug;
    await robot.save();
-   // delete old images from S3
-   if (images?.length) {
-      for (const img of oldImages) {
-         await deleteFileFromS3(img.key);
-      }
-   }
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
