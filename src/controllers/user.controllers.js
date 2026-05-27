@@ -100,7 +100,7 @@ const verifyUser = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: { accessToken },
+            data: { accessToken, refreshToken },
             message: "User logged in successfully!",
          })
       );
@@ -152,7 +152,7 @@ const loginUser = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: { accessToken },
+            data: { accessToken, refreshToken },
             message: "User logged in successfully!",
          })
       );
@@ -192,7 +192,7 @@ const googleLogin = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: { accessToken },
+            data: { accessToken, refreshToken },
             message: "User logged in successfully!",
          })
       );
