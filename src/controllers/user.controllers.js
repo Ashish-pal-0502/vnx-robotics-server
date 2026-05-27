@@ -281,7 +281,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
       .json(
          new ApiResponse({
             statusCode: StatusCodes.OK,
-            data: {accessToken},
+            data: { accessToken },
             message: "Access token refreshed successfully!",
          })
       );
@@ -388,23 +388,19 @@ const getUsers = asyncHandler(async (req, res) => {
 
 //change privilege
 const changePrivilege = asyncHandler(async (req, res) => {
-   const { value } = req.body;
-   if (value === undefined) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Value is required");
+   const { role } = req.body;
+   if (!role) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Role is required");
    }
-   if (typeof value !== "boolean") {
-      throw new ApiError(
-         StatusCodes.BAD_REQUEST,
-         "Value must be a boolean indicating admin status"
-      );
+   if (typeof role !== "string") {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Role must be a string");
    }
    const { id } = req.params;
    const user = await User.findByIdAndUpdate(
       { _id: id },
       {
          $set: {
-            role: value ? "admin" : "user",
-            is_admin: value,
+            role: role,
          },
       },
       { new: true }
