@@ -22,8 +22,8 @@ const generateAccessAndRefreshTokens = async (userId) => {
 //cookie option
 const options = {
    httpOnly: true,
-   secure: process.env.COOKIE_SECURE === "true", // Set secure flag based on environment variable
-   sameSite: "Strict",
+   secure: true,
+   sameSite: "none",
 };
 
 //register user
