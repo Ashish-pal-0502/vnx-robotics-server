@@ -29,12 +29,25 @@ const getUploadUrl = asyncHandler(async (req, res) => {
 
 // create robot
 const createRobot = asyncHandler(async (req, res) => {
-   const { name, description, images } = req.body;
+   const {
+      name,
+      description,
+      category,
+      specifications,
+      keyPoints,
+      applications,
+      images,
+   } = req.body;
+
+   // Validation
    if (!name) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Robot name is required!");
    }
    if (!description) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Description is required!");
+   }
+   if (!category) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Category is required!");
    }
    if (!images || images.length === 0) {
       throw new ApiError(
@@ -42,14 +55,33 @@ const createRobot = asyncHandler(async (req, res) => {
          "At least one image is required!"
       );
    }
+
+   // Validate specifications if provided
+   if (specifications && specifications.length > 0) {
+      for (const spec of specifications) {
+         if (!spec.label || !spec.value) {
+            throw new ApiError(
+               StatusCodes.BAD_REQUEST,
+               "Each specification must have both label and value!"
+            );
+         }
+      }
+   }
+
    const robot = await Robot.create({
       name,
       description,
+      category,
+      specifications: specifications || [],
+      keyPoints: keyPoints || [],
+      applications: applications || [],
       images,
       slug: `${slugify(name, {
          lower: true,
+         strict: true,
       })}-${Date.now()}`,
    });
+
    if (!robot) {
       throw new ApiError(
          StatusCodes.INTERNAL_SERVER_ERROR,
@@ -71,32 +103,67 @@ const updateRobot = asyncHandler(async (req, res) => {
    if (!robot) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Robot not found!");
    }
-   const { images } = req.body;
+   const {
+      name,
+      description,
+      category,
+      specifications,
+      keyPoints,
+      applications,
+      images,
+   } = req.body;
+
+   // Validate images
    if (images && images.length === 0) {
       throw new ApiError(
          StatusCodes.BAD_REQUEST,
          "At least one image is required!"
       );
    }
+   // Validate specifications if provided
+   if (specifications && specifications.length > 0) {
+      for (const spec of specifications) {
+         if (!spec.label || !spec.value) {
+            throw new ApiError(
+               StatusCodes.BAD_REQUEST,
+               "Each specification must have both label and value!"
+            );
+         }
+      }
+   }
+
+   // Handle image deletion from S3
    const oldImages = robot.images || [];
    const newImages = images || oldImages;
    const removedImages = oldImages.filter(
       (oldImg) => !newImages.some((newImg) => newImg.key === oldImg.key)
    );
+
    for (const img of removedImages) {
       if (img.key) {
          await deleteFileFromS3(img.key);
       }
    }
+
+   // Update fields
    robot.images = newImages;
-   robot.name = req.body.name || robot.name;
-   robot.description = req.body.description || robot.description;
-   robot.slug = req.body.name
-      ? `${slugify(req.body.name, {
-           lower: true,
-        })}-${Date.now()}`
-      : robot.slug;
+   robot.name = name || robot.name;
+   robot.description = description || robot.description;
+   robot.category = category || robot.category;
+   robot.specifications = specifications || robot.specifications;
+   robot.keyPoints = keyPoints || robot.keyPoints;
+   robot.applications = applications || robot.applications;
+
+   // Update slug if name changed
+   if (name && name !== robot.name) {
+      robot.slug = `${slugify(name, {
+         lower: true,
+         strict: true,
+      })}-${Date.now()}`;
+   }
+
    await robot.save();
+
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
@@ -112,11 +179,16 @@ const deleteRobot = asyncHandler(async (req, res) => {
    if (!robot) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Robot not found!");
    }
-   // delete images from S3
+
+   // Delete images from S3
    for (const img of robot.images) {
-      await deleteFileFromS3(img.key);
+      if (img.key) {
+         await deleteFileFromS3(img.key);
+      }
    }
+
    await robot.deleteOne();
+
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
@@ -132,10 +204,28 @@ const getRobotBySlug = asyncHandler(async (req, res) => {
    if (!slug) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Robot slug is required!");
    }
+
    const robot = await Robot.findOne({ slug });
    if (!robot) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Robot not found!");
    }
+
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { robot },
+         message: "Robot fetched successfully!",
+      })
+   );
+});
+
+// get robot by ID
+const getRobotById = asyncHandler(async (req, res) => {
+   const robot = await Robot.findById(req.params.id);
+   if (!robot) {
+      throw new ApiError(StatusCodes.NOT_FOUND, "Robot not found!");
+   }
+
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
@@ -147,20 +237,32 @@ const getRobotBySlug = asyncHandler(async (req, res) => {
 
 // get all robots
 const getAllRobots = asyncHandler(async (req, res) => {
-   let { page = 1, limit = 10, search = "" } = req.query;
+   let { page = 1, limit = 10, search = "", category } = req.query;
    page = parseInt(page);
    limit = parseInt(limit);
-   const query = {
-      name: {
-         $regex: search,
-         $options: "i",
-      },
-   };
+
+   const query = {};
+
+   // Search by name or description
+   if (search) {
+      query.$or = [
+         { name: { $regex: search, $options: "i" } },
+         { description: { $regex: search, $options: "i" } },
+         { category: { $regex: search, $options: "i" } },
+      ];
+   }
+
+   // Filter by category
+   if (category) {
+      query.category = { $regex: category, $options: "i" };
+   }
+
    const total = await Robot.countDocuments(query);
    const robots = await Robot.find(query)
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ createdAt: -1 });
+
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
@@ -169,10 +271,24 @@ const getAllRobots = asyncHandler(async (req, res) => {
             pagination: {
                total,
                page,
+               limit,
                pages: Math.ceil(total / limit),
             },
          },
          message: "Robots fetched successfully!",
+      })
+   );
+});
+
+// get all categories (for filtering)
+const getAllCategories = asyncHandler(async (req, res) => {
+   const categories = await Robot.distinct("category");
+
+   return res.status(StatusCodes.OK).json(
+      new ApiResponse({
+         statusCode: StatusCodes.OK,
+         data: { categories },
+         message: "Categories fetched successfully!",
       })
    );
 });
@@ -183,5 +299,7 @@ export {
    updateRobot,
    deleteRobot,
    getRobotBySlug,
+   getRobotById,
    getAllRobots,
+   getAllCategories,
 };
