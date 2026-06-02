@@ -6,7 +6,7 @@ import {
    deleteRobot,
    getRobotBySlug,
    getAllRobots,
-} from "../controllers/robot.controller.js";
+} from "../controllers/robot.controllers.js";
 import { isAdmin, verifyJWT } from "../middlewares/user.middleware.js";
 const router = express.Router();
 

@@ -5,21 +5,19 @@ import morgan from "morgan";
 
 // app
 const app = express();
-
-// =========================
-// CORS CONFIG
-// =========================
 const allowedOrigins = process.env.CORS_ORIGIN.split(",");
-
+//middleware
+app.use(express.json({ limit: "16kb" }));
+app.use(express.urlencoded({ extended: true, limit: "16kb" }));
+app.use(express.static("public"));
+app.use(cookieParser());
+app.use(morgan("dev"));
 app.use(
    cors({
       origin: (origin, callback) => {
-         // allow requests with no origin
-         // (mobile apps, postman, server-to-server)
          if (!origin) {
             return callback(null, true);
          }
-
          if (allowedOrigins.includes(origin)) {
             callback(null, true);
          } else {
@@ -29,43 +27,27 @@ app.use(
       credentials: true,
    })
 );
-
-// =========================
-// MIDDLEWARES
-// =========================
-app.use(express.json({ limit: "16kb" }));
-app.use(express.urlencoded({ extended: true, limit: "16kb" }));
-app.use(express.static("public"));
-app.use(cookieParser());
-app.use(morgan("dev"));
-
-// =========================
-// TEST ROUTE
-// =========================
+//test route
 app.get("/", (req, res) => {
    res.send("We are live.");
 });
 
-// =========================
-// IMPORT ROUTES
-// =========================
+//importing routes
 import userRouter from "./routes/user.routes.js";
 import blogRouter from "./routes/blog.routes.js";
 import careerRouter from "./routes/career.routes.js";
 import robotRouter from "./routes/robot.routes.js";
 import errorMiddleware from "./middlewares/error.middleware.js";
+import heroRouter from "./routes/hero.routes.js";
 
-// =========================
-// ROUTES
-// =========================
+//routes
 app.use("/api/v1/user", userRouter);
 app.use("/api/v1/blog", blogRouter);
 app.use("/api/v1/robot", robotRouter);
 app.use("/api/v1/career", careerRouter);
+app.use("/api/v1/hero", heroRouter);
 
-// =========================
-// ERROR MIDDLEWARE
-// =========================
+//error handling middleware
 app.use(errorMiddleware);
 
 export { app };

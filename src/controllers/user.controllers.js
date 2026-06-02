@@ -64,6 +64,9 @@ const registerUser = asyncHandler(async (req, res) => {
 //verify user
 const verifyUser = asyncHandler(async (req, res) => {
    const { email, otp } = req.body;
+   if (!email) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required!");
+   }
    if (!otp) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!");
    }
@@ -84,14 +87,8 @@ const verifyUser = asyncHandler(async (req, res) => {
    user.otpExpiry = undefined;
    user.is_verified = true;
    await user.save({ validateBeforeSave: false });
-   const createdUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-   );
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
-   );
-   const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
    );
    return res
       .status(StatusCodes.OK)
@@ -142,9 +139,6 @@ const loginUser = asyncHandler(async (req, res) => {
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
    );
-   const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-   );
    return res
       .status(StatusCodes.OK)
       .cookie("accessToken", accessToken, options)
@@ -167,24 +161,29 @@ const googleLogin = asyncHandler(async (req, res) => {
    }
    const ticket = await client.verifyIdToken({
       idToken: tokenId,
-      audience: audience,
+      audience: process.env.GOOGLE_CLIENT_ID,
    });
    const payload = ticket.getPayload();
    const { email, name } = payload;
+   if (!payload.email_verified) {
+      throw new ApiError(
+         StatusCodes.BAD_REQUEST,
+         "Email not verified by Google"
+      );
+   }
    let user = await User.findOne({ email });
    if (!user) {
       user = await User.create({
          name,
          email,
          password: crypto.randomBytes(5).toString("hex"),
+         is_verified: true,
       });
    }
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
    );
-   const loggedInUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-   );
+
    return res
       .status(StatusCodes.OK)
       .cookie("accessToken", accessToken, options)
@@ -269,11 +268,6 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
    const { accessToken, refreshToken } = await generateAccessAndRefreshTokens(
       user._id
    );
-   user.refreshToken = refreshToken;
-   await user.save();
-   const safeUser = await User.findById(user._id).select(
-      "-password -refreshToken"
-   );
    return res
       .status(StatusCodes.OK)
       .cookie("accessToken", accessToken, options)
@@ -315,6 +309,9 @@ const sendOTP = asyncHandler(async (req, res) => {
 //forgot password
 const forgotPassword = asyncHandler(async (req, res) => {
    const { email, otp, password } = req.body;
+   if (!email) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Email is required!");
+   }
    if (!otp) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "OTP is required!");
    }

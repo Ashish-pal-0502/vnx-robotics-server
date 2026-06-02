@@ -4,21 +4,34 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { Career } from "../models/career.model.js";
 import { StatusCodes } from "http-status-codes";
 
-// Crate career
+// Create career
 const createCareer = asyncHandler(async (req, res) => {
-   const { title, description, applyLink } = req.body;
+   const { title, description, location, jobType, category, applyLink } =
+      req.body;
    if (!title) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Title is required!");
    }
    if (!description) {
       throw new ApiError(StatusCodes.BAD_REQUEST, "Description is required!");
    }
+   if (!location) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Location is required!");
+   }
+   if (!jobType) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Job type is required!");
+   }
+   if (!category) {
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Category is required!");
+   }
    if (!applyLink) {
-      throw new ApiError(StatusCodes.BAD_REQUEST, "Appy link is required!");
+      throw new ApiError(StatusCodes.BAD_REQUEST, "Apply link is required!");
    }
    const career = await Career.create({
       title,
       description,
+      location,
+      jobType,
+      category,
       applyLink,
       postedBy: req.user?._id,
    });
@@ -26,66 +39,73 @@ const createCareer = asyncHandler(async (req, res) => {
       new ApiResponse({
          statusCode: StatusCodes.CREATED,
          data: { career },
-         message: "Career created sucessfully!",
+         message: "Career created successfully!",
       })
    );
 });
 
-//Get all careers
+// Get all careers
 const getAllCareers = asyncHandler(async (req, res) => {
    const careers = await Career.find()
       .populate("postedBy", "name email")
       .sort({ createdAt: -1 });
-
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
-         data: { count: careers.length, data: careers },
-         message: "Career found sucessfully!",
+         data: {
+            count: careers.length,
+            data: careers,
+         },
+         message: "Careers fetched successfully!",
       })
    );
 });
 
-//Get single career
-const getCareerById = async (req, res, next) => {
+// Get single career
+const getCareerById = asyncHandler(async (req, res) => {
    const career = await Career.findById(req.params.id).populate(
       "postedBy",
       "name email"
    );
    if (!career) {
-      throw new ApiError(StatusCodes.NOT_FOUND, "Career not found");
+      throw new ApiError(StatusCodes.NOT_FOUND, "Career not found!");
    }
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
          data: { career },
-         message: "Career created sucessfully!",
+         message: "Career fetched successfully!",
       })
    );
-};
+});
 
-//Update career
-const updateCareer = async (req, res, next) => {
-   const { title, description, applyLink } = req.body;
+// Update career
+const updateCareer = asyncHandler(async (req, res) => {
+   const { title, description, location, jobType, category, applyLink } =
+      req.body;
+
    const career = await Career.findById(req.params.id);
    if (!career) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Career not found!");
    }
-   career.title = title || career.title;
-   career.description = description || career.description;
-   career.applyLink = applyLink || career.applyLink;
+   career.title = title ?? career.title;
+   career.description = description ?? career.description;
+   career.location = location ?? career.location;
+   career.jobType = jobType ?? career.jobType;
+   career.category = category ?? career.category;
+   career.applyLink = applyLink ?? career.applyLink;
    await career.save();
    return res.status(StatusCodes.OK).json(
       new ApiResponse({
          statusCode: StatusCodes.OK,
-         data: {},
+         data: { career },
          message: "Career updated successfully!",
       })
    );
-};
+});
 
 // Delete career
-const deleteCareer = asyncHandler(async (req, res, next) => {
+const deleteCareer = asyncHandler(async (req, res) => {
    const career = await Career.findById(req.params.id);
    if (!career) {
       throw new ApiError(StatusCodes.NOT_FOUND, "Career not found!");
@@ -95,7 +115,7 @@ const deleteCareer = asyncHandler(async (req, res, next) => {
       new ApiResponse({
          statusCode: StatusCodes.OK,
          data: {},
-         message: "Career deleted successfully",
+         message: "Career deleted successfully!",
       })
    );
 });

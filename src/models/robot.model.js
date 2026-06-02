@@ -23,6 +23,42 @@ const robotSchema = new mongoose.Schema(
          trim: true,
          minlength: 10,
       },
+
+      category: {
+         type: String,
+         required: true,
+         trim: true,
+      },
+
+      specifications: [
+         {
+            label: {
+               type: String,
+               required: true,
+               trim: true,
+            },
+            value: {
+               type: String,
+               required: true,
+               trim: true,
+            },
+         },
+      ],
+
+      keyPoints: [
+         {
+            type: String,
+            trim: true,
+         },
+      ],
+
+      applications: [
+         {
+            type: String,
+            trim: true,
+         },
+      ],
+
       images: [
          {
             url: String,

@@ -13,13 +13,13 @@ const router = express.Router();
 
 //create career
 router.route("/create").post(verifyJWT, isAdmin, createCareer);
-//get all blog
+//get all careers
 router.route("/get-all").get(getAllCareers);
-//get blog by id
+//get career by id
 router.route("/get/:id").get(verifyJWT, isAdmin, getCareerById);
-//update blog
+//update career
 router.route("/update/:id").put(verifyJWT, isAdmin, updateCareer);
-//delete blog
-router.route("/delete/:id").delete(deleteCareer);
+//delete career
+router.route("/delete/:id").delete(verifyJWT, isAdmin, deleteCareer); // Added verifyJWT, isAdmin
 
 export default router;

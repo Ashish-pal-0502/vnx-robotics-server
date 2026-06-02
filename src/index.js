@@ -4,9 +4,9 @@ import colors from "colors";
 
 //dotenv config
 dotenv.config({ path: "./.env" });
-
+//app
 const { app } = await import("./app.js");
-
+//database connection
 connectDB()
    .then(() => {
       app.listen(process.env.PORT || 7072, () => {
