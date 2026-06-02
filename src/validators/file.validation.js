@@ -7,7 +7,6 @@ const allowedTypes = [
    "image/jpeg",
    "image/jpg",
    "image/webp",
-
    // Videos
    "video/mp4",
    "video/webm",
@@ -20,7 +19,6 @@ const allowedExt = [
    ".jpg",
    ".jpeg",
    ".webp",
-
    // Videos
    ".mp4",
    ".webm",
@@ -32,12 +30,10 @@ const MAX_SIZE = 20 * 1024 * 1024; // 20MB
 
 export const validateFile = ({ fileName, fileType, size }) => {
    const ext = path.extname(fileName).toLowerCase();
-
    // Type + extension validation
    if (!allowedTypes.includes(fileType) || !allowedExt.includes(ext)) {
       throw new ApiError(400, "Invalid file type");
    }
-
    // Size validation
    if (size < MIN_SIZE) {
       throw new ApiError(400, "File size too small (min 30KB)");

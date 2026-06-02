@@ -5,15 +5,13 @@ import morgan from "morgan";
 
 // app
 const app = express();
-
+const allowedOrigins = process.env.CORS_ORIGIN.split(",");
 //middleware
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
 app.use(express.static("public"));
 app.use(cookieParser());
 app.use(morgan("dev"));
-//cross origin
-const allowedOrigins = process.env.CORS_ORIGIN.split(",");
 app.use(
    cors({
       origin: (origin, callback) => {
@@ -29,7 +27,6 @@ app.use(
       credentials: true,
    })
 );
-
 //test route
 app.get("/", (req, res) => {
    res.send("We are live.");

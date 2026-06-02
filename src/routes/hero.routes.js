@@ -6,7 +6,7 @@ import {
    deleteHero,
    getHeroById,
    getAllHeroes,
-} from "../controllers/hero.controller.js";
+} from "../controllers/hero.controllers.js";
 
 import { verifyJWT, isAdmin } from "../middlewares/user.middleware.js";
 
