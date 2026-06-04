@@ -10,19 +10,15 @@ export const generateUploadURL = async (
    folder = "uploads"
 ) => {
    const key = `${folder}/${uuidv4()}-${fileName}`;
-
    const command = new PutObjectCommand({
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
       ContentType: fileType,
    });
-
    const uploadURL = await getSignedUrl(s3, command, {
       expiresIn: 300,
    });
-
    const fileUrl = `https://${process.env.AWS_BUCKET_NAME}.s3.${process.env.AWS_REGION}.amazonaws.com/${key}`;
-
    return {
       uploadURL,
       key,
@@ -36,6 +32,5 @@ export const deleteFileFromS3 = async (key) => {
       Bucket: process.env.AWS_BUCKET_NAME,
       Key: key,
    });
-
    await s3.send(command);
 };
