@@ -2,6 +2,10 @@ import mongoose from "mongoose";
 
 const robotSchema = new mongoose.Schema(
    {
+      is_development: {
+         type: Boolean,
+         default: false,
+      },
       name: {
          type: String,
          required: true,
@@ -23,13 +27,19 @@ const robotSchema = new mongoose.Schema(
          trim: true,
          minlength: 10,
       },
-
+      video: {
+         url: {
+            type: String,
+         },
+         key: {
+            type: String,
+         },
+      },
       category: {
          type: String,
-         required: true,
-         trim: true,
+         enum: ["Robots", "Controllers", "Equipment", "Software"],
+         default: "Robots",
       },
-
       specifications: [
          {
             label: {
