@@ -27,14 +27,12 @@ const robotSchema = new mongoose.Schema(
          trim: true,
          minlength: 10,
       },
-      video: {
-         url: {
-            type: String,
+      video: [
+         {
+            url: String,
+            key: String,
          },
-         key: {
-            type: String,
-         },
-      },
+      ],
       category: {
          type: String,
          enum: ["Robots", "Controllers", "Equipment", "Software"],

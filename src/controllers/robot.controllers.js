@@ -38,7 +38,7 @@ const createRobot = asyncHandler(async (req, res) => {
       applications,
       images,
       video,
-      is_development, // added is_development field
+      is_development,
    } = req.body;
 
    // Validation
@@ -70,13 +70,15 @@ const createRobot = asyncHandler(async (req, res) => {
       }
    }
 
-   // Validate video if provided
-   if (video) {
-      if (!video.url && !video.key) {
-         throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "Video must have either url or key!"
-         );
+   // Validate video array if provided
+   if (video && video.length > 0) {
+      for (const videoItem of video) {
+         if (!videoItem.url && !videoItem.key) {
+            throw new ApiError(
+               StatusCodes.BAD_REQUEST,
+               "Each video must have either url or key!"
+            );
+         }
       }
    }
 
@@ -87,9 +89,9 @@ const createRobot = asyncHandler(async (req, res) => {
       specifications: specifications || [],
       keyPoints: keyPoints || [],
       applications: applications || [],
-      images,
-      video: video || { url: null, key: null },
-      is_development: is_development !== undefined ? is_development : false, // set is_development with default false
+      images: images || [],
+      video: video || [],
+      is_development: is_development !== undefined ? is_development : false,
       slug: `${slugify(name, {
          lower: true,
          strict: true,
@@ -126,7 +128,7 @@ const updateRobot = asyncHandler(async (req, res) => {
       applications,
       images,
       video,
-      is_development, // added is_development field
+      is_development,
    } = req.body;
 
    // Validate images
@@ -149,13 +151,15 @@ const updateRobot = asyncHandler(async (req, res) => {
       }
    }
 
-   // Validate video if provided
-   if (video) {
-      if (!video.url && !video.key) {
-         throw new ApiError(
-            StatusCodes.BAD_REQUEST,
-            "Video must have either url or key!"
-         );
+   // Validate video array if provided
+   if (video && video.length > 0) {
+      for (const videoItem of video) {
+         if (!videoItem.url && !videoItem.key) {
+            throw new ApiError(
+               StatusCodes.BAD_REQUEST,
+               "Each video must have either url or key!"
+            );
+         }
       }
    }
 
@@ -172,11 +176,19 @@ const updateRobot = asyncHandler(async (req, res) => {
       }
    }
 
-   // Handle video deletion from S3 if video key is being removed/updated
-   if (video && robot.video && robot.video.key) {
-      const isVideoRemoved = !video.key || video.key !== robot.video.key;
-      if (isVideoRemoved && robot.video.key) {
-         await deleteFileFromS3(robot.video.key);
+   // Handle video deletion from S3
+   const oldVideos = robot.video || [];
+   const newVideos = video !== undefined ? video : oldVideos;
+
+   // Find videos that were removed
+   const removedVideos = oldVideos.filter(
+      (oldVideo) => !newVideos.some((newVideo) => newVideo.key === oldVideo.key)
+   );
+
+   // Delete removed videos from S3
+   for (const videoItem of removedVideos) {
+      if (videoItem.key) {
+         await deleteFileFromS3(videoItem.key);
       }
    }
 
@@ -218,7 +230,7 @@ const updateRobot = asyncHandler(async (req, res) => {
    );
 });
 
-// delete robot (updated to handle video deletion)
+// delete robot (updated to handle multiple videos)
 const deleteRobot = asyncHandler(async (req, res) => {
    const robot = await Robot.findById(req.params.id);
    if (!robot) {
@@ -232,9 +244,11 @@ const deleteRobot = asyncHandler(async (req, res) => {
       }
    }
 
-   // Delete video from S3 if it has a key
-   if (robot.video && robot.video.key) {
-      await deleteFileFromS3(robot.video.key);
+   // Delete all videos from S3
+   for (const videoItem of robot.video) {
+      if (videoItem.key) {
+         await deleteFileFromS3(videoItem.key);
+      }
    }
 
    await robot.deleteOne();
@@ -286,9 +300,14 @@ const getRobotById = asyncHandler(async (req, res) => {
 });
 
 // get all robots (optionally filter by is_development)
-// get all robots (show all robots, including development)
 const getAllRobots = asyncHandler(async (req, res) => {
-   let { page = 1, limit = 10, search = "", category, includeDevelopment } = req.query;
+   let {
+      page = 1,
+      limit = 10,
+      search = "",
+      category,
+      includeDevelopment,
+   } = req.query;
    page = parseInt(page);
    limit = parseInt(limit);
 
