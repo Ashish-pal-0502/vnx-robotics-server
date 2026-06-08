@@ -5,7 +5,10 @@ import morgan from "morgan";
 
 // app
 const app = express();
-const allowedOrigins = process.env.CORS_ORIGIN.split(",");
+const allowedOrigins = process.env.CORS_ORIGIN
+  .split(",")
+  .map(origin => origin.trim())
+  .filter(origin => origin.length > 0);
 //middleware
 app.use(express.json({ limit: "16kb" }));
 app.use(express.urlencoded({ extended: true, limit: "16kb" }));
@@ -21,10 +24,13 @@ app.use(
          if (allowedOrigins.includes(origin)) {
             callback(null, true);
          } else {
+            console.warn(`❌ CORS blocked origin: ${origin}. Allowed: ${allowedOrigins.join(", ")}`);
             callback(new Error("CORS not allowed"));
          }
       },
       credentials: true,
+      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+      allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
    })
 );
 //test route
