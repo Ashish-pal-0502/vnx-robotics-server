@@ -22,8 +22,8 @@ const generateAccessAndRefreshTokens = async (userId) => {
 //cookie option
 const options = {
    httpOnly: true,
-   secure: true,
-   sameSite: "none",
+   secure: process.env.NODE_ENV === "production", // HTTPS in production, HTTP in development
+   sameSite: process.env.NODE_ENV === "production" ? "none" : "lax",
 };
 
 //register user
