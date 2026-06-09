@@ -35,7 +35,7 @@ router.route("/google-auth").post(loginLimiter, googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
 //verify user
-router.route("/verify").post(isLogout, otpLimiter, verifyUser);
+router.route("/verify").post(isLogout, verifyUser);
 router.route("/send-otp").post(isLogout, otpLimiter, sendOTP);
 // forgot password
 router.route("/forgot-password").post(isLogout, otpLimiter, forgotPassword);
