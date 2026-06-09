@@ -18,23 +18,27 @@ import {
    isLogout,
    verifyJWT,
 } from "../middlewares/user.middleware.js";
+import {
+   loginLimiter,
+   otpLimiter,
+} from "../middlewares/rateLimit.middleware.js";
 import { sendOtpOnMail } from "../helpers/email.helper.js";
 
 const router = Router();
 //routes
 //register user
-router.route("/register").post(registerUser);
+router.route("/register").post(otpLimiter, registerUser);
 //login user
-router.route("/login").post(isLogout, loginUser);
+router.route("/login").post(isLogout, loginLimiter, loginUser);
 //google login
-router.route("/google-auth").post(googleLogin);
+router.route("/google-auth").post(loginLimiter, googleLogin);
 //logout user
 router.route("/logout").post(verifyJWT, logoutUser);
 //verify user
-router.route("/verify").post(isLogout, verifyUser);
-router.route("/send-otp").post(isLogout, sendOTP);
+router.route("/verify").post(isLogout, otpLimiter, verifyUser);
+router.route("/send-otp").post(isLogout, otpLimiter, sendOTP);
 // forgot password
-router.route("/forgot-password").post(isLogout, forgotPassword);
+router.route("/forgot-password").post(isLogout, otpLimiter, forgotPassword);
 //get logged in user details
 router.route("/me").get(verifyJWT, getMe);
 //refresh access token
