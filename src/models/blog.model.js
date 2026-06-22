@@ -5,8 +5,6 @@ const blogSchema = new mongoose.Schema(
       heading: {
          type: String,
          trim: true,
-         min: 3,
-         max: 160,
       },
       image: [
          {
