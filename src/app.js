@@ -5,10 +5,6 @@ import morgan from "morgan";
 
 // app
 const app = express();
-const allowedOrigins = process.env.CORS_ORIGIN
-  .split(",")
-  .map(origin => origin.trim())
-  .filter(origin => origin.length > 0);
 //middleware
 app.use(express.json({ limit: "1024kb" }));
 app.use(express.urlencoded({ extended: true, limit: "1024kb" }));
@@ -17,20 +13,8 @@ app.use(cookieParser());
 app.use(morgan("dev"));
 app.use(
    cors({
-      origin: (origin, callback) => {
-         if (!origin) {
-            return callback(null, true);
-         }
-         if (allowedOrigins.includes(origin)) {
-            callback(null, true);
-         } else {
-            console.warn(`❌ CORS blocked origin: ${origin}. Allowed: ${allowedOrigins.join(", ")}`);
-            callback(new Error("CORS not allowed"));
-         }
-      },
+      origin: process.env.CORS_ORIGIN,
       credentials: true,
-      methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-      allowedHeaders: ["Content-Type", "Authorization", "x-auth-token"],
    })
 );
 //test route
